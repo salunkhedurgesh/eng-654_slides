@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>
+        Kinematics Grounded Motion Planning of Robots
+    </title>
+
+    <link rel="stylesheet" href="css/slides.css">
+
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['\\(', '\\)']],
+                displayMath: [['\\[', '\\]']]
+            }
+        };
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+    </script>
+
+</head>
+
+
+<body>
+
+    <main class="presentation">
+        <!-- Slide: Course title -->
+        <section class="slide">
+
+            <p class="eyebrow">
+                ENG-654
+            </p>
+
+            <h1 class="slide-title">
+                Kinematics Grounded
+                Motion Planning of Robots
+            </h1>
+
+            <p class="subtitle">
+                From robot geometry to certified motion.
+            </p>
+
+        </section>
+
+        <!-- Slide: Two parts -->
+        <section class="slide">
+
+            <h2 class="slide-title">
+                Two worlds of robot kinematics
+            </h2>
+
+            <div class="layout-two-column">
+
+                <div class="show">
+                    <h3>
+                        Serial robots
+                    </h3>
+                    <p>
+                        Motion propagates through a sequence
+                        of joints and links.
+                    </p>
+                </div>
+
+                <div class="show">
+                    <h3>
+                        Parallel robots
+                    </h3>
+                    <p>
+                        Several kinematic chains constrain
+                        the same moving platform.
+                    </p>
+                </div>
+
+            </div>
+
+        </section>
+
+        <!-- let's do some maths -->
+        <section class="slide">
+
+            <h2 class="slide-title">
+                Forward Kinematics
+            </h2>
+
+            <p class="lead">
+                Forward kinematics maps a joint configuration
+                to an end-effector pose.
+            </p>
+
+            <div class="equation">
+
+                \[
+                \mathbf{x} = f(\mathbf{q})
+                \]
+
+                \[
+                \dot{\mathbf{x}} = \mathbf{J}\dot{\mathbf{q}}\\
+                \]
+                \[
+                \dot{\mathbf{q}} = \mathbf{J}^{-1}\dot{\mathbf{x}}, \det(\mathbf{J}(\mathbf{q})) \neq 0
+                \]
+
+            </div>
+
+        </section>
+
+        <!-- Slide: Jacobian -->
+        <section class="slide">
+
+            <h2 class="slide-title">
+                From Joint Motion to Cartesian Motion
+            </h2>
+
+            <div class="layout-two-column">
+
+                <div>
+
+                    <p class="lead">
+                        Small changes in joint configuration
+                        produce motion of the end-effector.
+                    </p>
+
+                    <p>
+                        The differential relationship is described
+                        by the geometric Jacobian.
+                    </p>
+
+                </div>
+
+                <div class="equation">
+
+                    \[
+                    \boldsymbol{\xi}
+                    =
+                    {\color{red}{J(\mathbf{q})}}
+                    \dot{\mathbf{q}}
+                    \]
+
+                </div>
+
+            </div>
+
+        </section>
+
+        <!-- LaTeX in browser! -->
+        <section class="slide">
+
+            <div class="equation">
+
+                \[
+                \begin{aligned}
+                \mathbf{T}(\mathbf{q})
+                &=
+                e^{[\mathcal{S}_1]q_1}
+                e^{[\mathcal{S}_2]q_2}
+                \cdots
+                e^{[\mathcal{S}_n]q_n}
+                \mathbf{M}
+                \\[4pt]
+                &=
+                \prod_{i=1}^{n}
+                e^{[\mathcal{S}_i]q_i}
+                \mathbf{M}
+                \end{aligned}
+                \]
+
+            </div>
+
+            <div class="equation">
+
+                \[
+                J(\mathbf{q}) =
+                \begin{bmatrix}
+                \vert & \vert & & \vert \\
+                \mathcal{S}_1' &
+                \mathcal{S}_2' &
+                \cdots &
+                \mathcal{S}_n' \\
+                \vert & \vert & & \vert
+                \end{bmatrix}
+                \]
+
+            </div>
+
+            <div class="equation">
+
+                \[
+                T =
+                \begin{bmatrix}
+                R & \mathbf{p} \\
+                \mathbf{0}^{T} & 1
+                \end{bmatrix}
+                \in SE(3)
+                \]
+
+            </div>
+
+        </section>
+
+        <!-- visual hierarchy in mathematical expression -->
+        <section class="slide">
+
+            <h2 class="slide-title">
+                A Robot Pose
+            </h2>
+
+            <div class="layout-two-column">
+
+                <div class="equation">
+
+                    \[
+                    T =
+                    \begin{bmatrix}
+                    R & \mathbf{p} \\
+                    \mathbf{0}^{T} & 1
+                    \end{bmatrix}
+                    \]
+
+                </div>
+
+                <div>
+
+                    <p>
+                        \(R \in SO(3)\)
+                        describes orientation.
+                    </p>
+
+                    <p>
+                        \(\mathbf{p} \in \mathbb{R}^{3}\)
+                        describes position.
+                    </p>
+
+                </div>
+
+            </div>
+
+            <div class="layout-two-column">
+
+                <div class="equation">
+                    \[
+                    T =
+                    \begin{bmatrix}
+                    R & \mathbf{p} \\
+                    \mathbf{0}^{T} & 1
+                    \end{bmatrix}
+                    \]
+                </div>
+
+                <div>
+                    <p>
+                        \(R \in SO(3)\)
+                        describes orientation.
+                    </p>
+                    <p>
+                        \(\mathbf{p} \in \mathbb{R}^{3}\)
+                        describes position.
+                    </p>
+                </div>
+
+            </div>
+
+        </section>
+
+        <section class="slide">
+            <h2 class="slide-title">
+                Video embedding
+            </h2>
+            <div class="video-container video-zoom-3_2x">
+                <video class="slide-video" autoplay muted loop playsinline>
+                    <source src="assets/videos/sample.mp4" type="video/mp4">
+                </video>
+            </div>
+        </section>
+
+    </main>
+
+</body>
+
+</html>

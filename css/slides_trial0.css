@@ -1,0 +1,60 @@
+:root {
+    --epfl-red: #ff0000;
+    --black: #000000;
+    --white: #ffffff;
+
+    --science-yellow: #D79B00;
+    --science-green: #82B366;
+    --science-purple: #9673A6;
+    --science-blue: #6C8EBF;
+}
+
+body {
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+.slide {
+    width: 100vw;
+    height: 100vh;
+
+    box-sizing: border-box;
+
+    padding: 70px;
+
+    background: white;
+}
+
+.slide-title {
+    font-size: 42px;
+    font-weight: 600;
+    margin: 0 0 40px 0;
+}
+
+.two-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 60px;
+    align-items: center;
+}
+
+.layout-two-column {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 60px;
+    align-items: center;
+}
+
+.slide-image {
+    width: 100%;
+    height: auto;
+}
+
+.viewer {
+    width: 100%;
+    height: 500px;
+    border: 1px solid #ddd;
+}
+
+.show {
+    border: 1px solid black;
+}

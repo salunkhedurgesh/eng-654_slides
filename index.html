@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>
+        Kinematics Grounded Motion Planning of Robots
+    </title>
+
+    <link rel="stylesheet" href="css/slides.css">
+
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['\\(', '\\)']],
+                displayMath: [['\\[', '\\]']]
+            }
+        };
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+    </script>
+
+</head>
+
+
+<body>
+
+    <main class="presentation">
+        <!-- Slide: Course title -->
+        <section class="slide title-slide">
+
+            <div class="title-slide-content">
+
+                <p class="eyebrow">
+                    ENG-654
+                </p>
+
+                <h1 class="course-title">
+                    Kinematics Grounded Motion Planning of Robots
+                </h1>
+
+                <p class="course-author">
+                    Durgesh Salunkhe
+                </p>
+
+            </div>
+
+        </section>
+
+        <!-- Slide: Robots are everywhere -->
+        <section class="slide">
+
+            <h2 class="slide-title">
+                Robots are everywhere
+            </h2>
+            <p class="lead">
+                Robot architectures have diversified enormously,
+                but their motion is still governed by the geometry
+                of links, joints, and constraints.
+            </p>
+
+            <div class="layout-three-column">
+
+                <div class="visual-card">
+                    <img src="assets/images/kuka_kr120.jpg" alt="Industrial robot">
+                    <h3>
+                        Industrial robots
+                    </h3>
+                    <p>
+                        High speed, repeatability, and payload.
+                    </p>
+                </div>
+
+                <div class="visual-card">
+                    <img src="assets/images/crx.jpeg" alt="FANUC CRX collaborative robot">
+                    <h3>
+                        Collaborative robots
+                    </h3>
+                    <p>
+                        Designed for flexible human–robot workspaces.
+                    </p>
+                </div>
+
+                <div class="visual-card">
+                    <img src="assets/images/unitree_h2.jpeg" alt="Humanoid robot">
+                    <h3>
+                        Humanoid robots
+                    </h3>
+                    <p>
+                        Highly articulated systems operating in human environments.
+                    </p>
+                </div>
+
+            </div>
+
+        </section>
+
+        <!-- Slide: Robots are still made of basic components -->
+        <section class="slide">
+
+            <h2 class="slide-title">
+                Complex robots are built from simpler mechanisms
+            </h2>
+
+            <div class="layout-40-60">
+
+                <div>
+
+                    <p class="lead">
+                        Behind every robot is an arrangement of
+                        rigid links connected through joints.
+                    </p>
+
+                    <p>
+                        These arrangements can often be understood
+                        using two fundamental architectures:
+                    </p>
+
+                    <ul class="minimal-list">
+                        <li>
+                            serial kinematic chains
+                        </li>
+
+                        <li>
+                            parallel kinematic mechanisms
+                        </li>
+                    </ul>
+                </div>
+
+
+                <div class="figure-container">
+                    <img src="assets/images/kinematic_equivalence.svg" alt="Robot decomposed into kinematic components">
+                </div>
+
+            </div>
+
+        </section>
+    </main>
+
+</body>
+
+</html>

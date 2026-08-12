@@ -1,0 +1,337 @@
+/* custom colors */
+:root {
+
+    --epfl-red: #FF0000;
+
+    --black: #000000;
+    --white: #FFFFFF;
+
+    --science-yellow: #D79B00;
+    --science-green: #82B366;
+    --science-purple: #9673A6;
+    --science-blue: #6C8EBF;
+
+}
+
+/* font hierarchy */
+:root {
+    /* Typography */
+    --font-small: clamp(0.8rem, 0.9vw, 1rem);
+    --font-body: clamp(1rem, 1.35vw, 1.55rem);
+    --font-lead: clamp(1.2rem, 1.9vw, 2rem);
+    --font-h3: clamp(1.5rem, 2.2vw, 2.4rem);
+    --font-h2: clamp(2.2rem, 3.5vw, 4.2rem);
+    --font-h1: clamp(3rem, 5vw, 6rem);
+
+    /* Horizontal spacing */
+    --gap-xs: clamp(0.5rem, 1vw, 1rem);
+    --gap-sm: clamp(1rem, 2vw, 2rem);
+    --gap-md: clamp(1.5rem, 3.5vw, 4rem);
+    --gap-lg: clamp(2rem, 5vw, 6rem);
+    --gap-xl: clamp(3rem, 7vw, 8rem);
+
+    /* Vertical spacing */
+    --vgap-xs: clamp(0.5rem, 1vh, 1rem);
+    --vgap-sm: clamp(1rem, 2vh, 2rem);
+    --vgap-md: clamp(1.5rem, 3vh, 3rem);
+    --vgap-lg: clamp(2rem, 5vh, 5rem);
+
+    /* Slide padding */
+    --slide-padding-x: clamp(2rem, 5vw, 6rem);
+    --slide-padding-y: clamp(2rem, 5vh, 5rem);
+}
+
+/* setting the font sizes once and for all */
+body {
+    font-size: var(--font-body);
+}
+
+h1 {
+    font-size: var(--font-h1);
+}
+
+h2 {
+    font-size: var(--font-h2);
+}
+
+h3 {
+    font-size: var(--font-h3);
+}
+
+.lead {
+    font-size: var(--font-lead);
+}
+
+.caption,
+.small-text {
+    font-size: var(--font-small);
+}
+
+/* def show: draw a border around teh element, for debug */
+.show {
+    outline: 2px dotted red;
+}
+
+/* Normally CSS dimensions can behave unintuitively. The following command makes teh dimensions consistent */
+* {
+    box-sizing: border-box;
+    /* outline: 1px solid red; */
+}
+
+/* This removes the browser's default margin. */
+html,
+body {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    font-size: var(--font-body);
+}
+
+/* Establish font type */
+body {
+    font-family:
+        Arial,
+        Helvetica,
+        sans-serif;
+
+    background: white;
+    color: black;
+}
+
+/* slide definition */
+.slide {
+    width: 100vw;
+    height: 100vh;
+    /* padding: */
+    /* clamp(2rem, 5vh, 5rem) clamp(2rem, 5vw, 6rem); */
+    /* padding convention: top right bottom left */
+    padding:
+        3vh var(--slide-padding-x) var(--slide-padding-y) var(--slide-padding-x);
+    display: flex;
+    flex-direction: column;
+    background: white;
+    overflow: hidden;
+    outline: 1px solid red;
+}
+
+/* slide title styling */
+.slide-title {
+    margin: 0;
+    /* font-size: */
+    /* clamp(2.8rem, 5vw, 6rem); */
+    font-size: var(--font-h2);
+    font-weight: 700;
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+    /* transform: translateZ(5rem); */
+}
+
+/* eyebrow styling */
+.eyebrow {
+    margin: 0 0 2vh 0;
+    color: var(--epfl-red);
+    font-size:
+        clamp(0.9rem, 1.2vw, 1.4rem);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+}
+
+/* slide subtitle styling */
+.subtitle {
+    max-width: 50ch;
+    margin-top: 3vh;
+    font-size:
+        clamp(1.2rem, 2vw, 2rem);
+    line-height: 1.4;
+    font-weight: 300;
+}
+
+/* two column layout */
+.layout-two-column {
+    display: grid;
+    grid-template-columns:
+        minmax(0, 1fr) minmax(0, 1fr);
+    /* gap:
+        clamp(2rem, 6vw, 7rem); */
+    gap: var(--gap-lg);
+    align-items: center;
+    margin-top: 5vh;
+    max-height: 80%;
+}
+
+/* lead styling */
+.lead {
+    font-size: var(--font-lead);
+    line-height: 1.35;
+    font-weight: 400;
+    /* max-width: 38ch; */
+}
+
+/* equations styling */
+.equation {
+    font-size: var(--font-lead);
+    margin-block: var(--vgap-md);
+    text-align: center;
+}
+
+/* caption styling */
+.caption {
+    font-size: var(--font-small);
+    line-height: 1.4;
+    color: #555;
+}
+
+/* video styling */
+.video-container {
+    width: 100%;
+    height: 100%;
+
+    display: flex;
+    justify-content: center;
+    /* horizontal */
+    align-items: center;
+    /* vertical */
+}
+
+.slide-video {
+    max-width: 90%;
+    max-height: 80vh;
+    object-fit: contain;
+    outline: 1px solid salmon;
+}
+
+/* video styling scaling, resizing etc */
+.video-zoom-3_2x {
+    transform: scale(1.5);
+    transform-origin: center;
+}
+
+/* TITLE SLIDE */
+.title-slide {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+}
+
+.title-slide-content {
+    max-width: 70vw;
+}
+
+.course-title {
+    margin: 0;
+    font-size: var(--font-h1);
+    line-height: 1.05;
+    font-weight: 700;
+    letter-spacing: -0.035em;
+}
+
+.course-author {
+    margin-top: var(--vgap-md);
+    font-size: var(--font-body);
+}
+
+/* THREE COLUMN LAYOUT */
+.layout-three-column {
+    display: grid;
+    grid-template-columns:
+        repeat(3, minmax(0, 1fr));
+    gap: var(--gap-md);
+    align-items: stretch;
+}
+
+.visual-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vgap-sm);
+    /* outline: 1px solid red; */
+}
+
+.visual-card {
+    border-top: 4px solid var(--epfl-red);
+    padding-top: var(--vgap-sm);
+}
+
+.visual-card img {
+    width: 100%;
+    height: 42vh;
+    object-fit: contain;
+    /* object-fit: contain; is another option that keeps the complete image */
+}
+
+.visual-card h3 {
+    margin: 0;
+    font-size: var(--font-h3);
+    line-height: 1.15;
+}
+
+.visual-card p {
+    margin: 0;
+    font-size: var(--font-body);
+    line-height: 1.4;
+}
+
+/* A 40-60 text + visual slide */
+.layout-40-60 {
+    display: grid;
+    grid-template-columns:
+        minmax(0, 2fr) minmax(0, 3fr);
+    gap: var(--gap-lg);
+    flex: 1;
+    min-height: 0;
+    align-items: stretch;
+}
+
+.layout-40-60> :nth-child(2) {
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 0;
+}
+
+/* A reversed 60 40 layout */
+.layout-60-40 {
+    display: grid;
+    grid-template-columns:
+        minmax(0, 3fr) minmax(0, 2fr);
+    gap: var(--gap-lg);
+    flex: 1;
+    min-height: 0;
+    align-items: center;
+}
+
+.figure-container {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 0;
+}
+
+.visual-container img,
+.visual-container video,
+.visual-container canvas {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+/* Minimal list presentation */
+.minimal-list {
+    margin:
+        var(--vgap-md) 0 0 0;
+    padding-left: 1.2em;
+    font-size: var(--font-lead);
+    line-height: 1.5;
+}
+
+.minimal-list li {
+    margin-bottom: var(--vgap-sm);
+}
+
+.minimal-list li::marker {
+    color: var(--epfl-red);
+}

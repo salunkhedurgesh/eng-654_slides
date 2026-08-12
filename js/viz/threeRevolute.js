@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { createZUpWorld, resizeRendererToContainer } from './threeUtils.js';
+import { createBoldAxes, createZUpWorld, resizeRendererToContainer } from './threeUtils.js';
 
 export function initThreeRevoluteDemos() {
   document.querySelectorAll('[data-three-revolute]').forEach(container => {
@@ -32,7 +32,7 @@ function createThreeRevoluteDemo(container) {
   scene.add(directional);
 
   const robotWorld = createZUpWorld(scene);
-  const axes = new THREE.AxesHelper(1.4);
+  const axes = createBoldAxes(1.4);
   robotWorld.add(axes);
 
   const revoluteJoint = new THREE.Group();

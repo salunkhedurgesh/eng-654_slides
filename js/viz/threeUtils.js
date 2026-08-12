@@ -8,6 +8,44 @@ export function createZUpWorld(scene) {
   return robotWorld;
 }
 
+export function createBoldAxes(length = 1.4) {
+  const axes = new THREE.Group();
+  const headLength = length * 0.18;
+  const shaftLength = length - headLength;
+  const shaftRadius = length * 0.025;
+  const headRadius = length * 0.065;
+
+  const addAxis = (color, rotation, position) => {
+    const material = new THREE.MeshStandardMaterial({ color });
+    const axis = new THREE.Group();
+
+    const shaft = new THREE.Mesh(
+      new THREE.CylinderGeometry(shaftRadius, shaftRadius, shaftLength, 20),
+      material
+    );
+    shaft.position.y = shaftLength / 2;
+    axis.add(shaft);
+
+    const arrowhead = new THREE.Mesh(
+      new THREE.ConeGeometry(headRadius, headLength, 24),
+      material
+    );
+    arrowhead.position.y = shaftLength + headLength / 2;
+    axis.add(arrowhead);
+
+    axis.rotation.set(...rotation);
+    axis.position.set(...position);
+    axes.add(axis);
+  };
+
+  // Three.js cylinders and cones point along +y by default.
+  addAxis(0xff3030, [0, 0, -Math.PI / 2], [0, 0, 0]); // +x
+  addAxis(0x35b85a, [0, 0, 0], [0, 0, 0]);             // +y
+  addAxis(0x2775ff, [Math.PI / 2, 0, 0], [0, 0, 0]);   // +z
+
+  return axes;
+}
+
 export function resizeRendererToContainer(renderer, camera, container) {
   const width = Math.max(1, container.clientWidth);
   const height = Math.max(1, container.clientHeight);

@@ -10,6 +10,9 @@ mkdir -p "$ROOT/vendor/three/build" "$ROOT/vendor/three/examples/jsm/controls"
 curl -L "$BASE/build/three.module.js" \
   -o "$ROOT/vendor/three/build/three.module.js"
 
+curl -L "$BASE/build/three.core.js" \
+  -o "$ROOT/vendor/three/build/three.core.js"
+
 curl -L "$BASE/examples/jsm/controls/OrbitControls.js" \
   -o "$ROOT/vendor/three/examples/jsm/controls/OrbitControls.js"
 

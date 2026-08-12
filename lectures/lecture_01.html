@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Introduction, Frames, Transformations, and DH Modelling — ENG-654</title>
+  <link rel="stylesheet" href="../css/base.css">
+  <link rel="stylesheet" href="../css/layouts.css">
+  <link rel="stylesheet" href="../css/components.css">
+  <link rel="stylesheet" href="../css/reveal.css">
+  <link rel="stylesheet" href="../css/navigation.css">
+  <link rel="stylesheet" href="../css/viz.css">
+
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['\\(', '\\)']],
+        displayMath: [['\\[', '\\]']]
+      }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "../vendor/three/build/three.module.js",
+      "three/addons/": "../vendor/three/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body class="mode-deck">
+  <main id="deck" class="deck">
+
+    <section class="slide title-slide">
+      <div class="title-slide-content">
+        <p class="eyebrow">ENG-654 · Session 1 · Lecture 1</p>
+        <h1 class="course-title">Introduction, Frames, Transformations, and DH Modelling</h1>
+        <p class="subtitle">How do we convert a physical robot into a reproducible mathematical model?</p>
+      </div>
+    </section>
+
+    <section class="slide">
+      <h2 class="slide-title">Opening motivation: reachable is not always executable</h2>
+      <div class="layout-40-60">
+        <div>
+          <p class="lead">A pose can be reachable while a path to it is not safely executable.</p>
+          <div class="reveal-children">
+            <p>One pose may admit several joint solutions.</p>
+            <p>A Cartesian line may cross a joint limit or singular region.</p>
+            <p>Planning must respect the geometry of the robot, not only the endpoint.</p>
+          </div>
+        </div>
+        <div class="visual-container">
+          <img class="technical-figure" src="../assets/svg/certified_pipeline.svg" alt="Certified planning pipeline">
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <h2 class="slide-title">The four-session narrative</h2>
+      <div class="layout-four-step reveal-children" style="display:grid;grid-template-columns:repeat(4,1fr);gap:var(--gap-md);flex:1;align-items:center;">
+        <div class="definition"><strong>Read</strong><br>links, joints, frames, limits</div>
+        <div class="definition"><strong>Solve</strong><br>FK, IK, branch structure</div>
+        <div class="definition"><strong>Understand</strong><br>Jacobians, singularities, aspects</div>
+        <div class="definition"><strong>Plan</strong><br>certified feasible motion</div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <h2 class="slide-title">Configuration and configuration space</h2>
+      <div class="layout-40-60">
+        <div>
+          <p class="lead">For an \(n\)-joint serial robot, one configuration is a vector</p>
+          <div class="equation">\[\mathbf{q}=[q_1,\ldots,q_n]^T.\]</div>
+          <p>The configuration space is the set of all admissible joint vectors.</p>
+        </div>
+        <div class="visual-container">
+          <div data-robot2r data-q1="45" data-q2="60" data-trace="true"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <h2 class="slide-title">Coordinate frames are part of the model</h2>
+      <div class="layout-60-40">
+        <div class="visual-container">
+          <div data-three-revolute></div>
+        </div>
+        <div>
+          <p class="lead">The same physical point has different numerical coordinates in different frames.</p>
+          <p>In all Three.js course visualizations, the robotics world is <strong>z-up</strong>. The root group is rotated by \(R_x(-\pi/2)\).</p>
+          <div class="equation">\[R(q)=e^{[\boldsymbol{\omega}]q}\]</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <h2 class="slide-title">Homogeneous transformations</h2>
+      <div class="layout-two-column divided">
+        <div class="equation">
+          \[
+          {^A T_B}=\begin{bmatrix}
+          {^A R_B} & {^A\mathbf{p}_B}\\
+          \mathbf{0}^T & 1
+          \end{bmatrix}
+          \]
+        </div>
+        <div class="reveal-children">
+          <p><strong>Rotation block:</strong> orientation of frame \(B\) expressed in frame \(A\).</p>
+          <p><strong>Translation block:</strong> position of the origin of \(B\) expressed in frame \(A\).</p>
+          <p><strong>Compatibility rule:</strong> repeated frame indices must match during composition.</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+  <script src="../js/deck/nav-runtime.js"></script>
+  <script type="module" src="../js/main.js"></script>
+</body>
+</html>

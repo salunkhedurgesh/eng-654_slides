@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Representative Wrist-Partitioned 6R and 7R Inverse Kinematics — ENG-654</title>
+  <link rel="stylesheet" href="../css/base.css">
+  <link rel="stylesheet" href="../css/layouts.css">
+  <link rel="stylesheet" href="../css/components.css">
+  <link rel="stylesheet" href="../css/reveal.css">
+  <link rel="stylesheet" href="../css/navigation.css">
+  <link rel="stylesheet" href="../css/viz.css">
+
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['\\(', '\\)']],
+        displayMath: [['\\[', '\\]']]
+      }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "../vendor/three/build/three.module.js",
+      "three/addons/": "../vendor/three/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body class="mode-deck">
+  <main id="deck" class="deck">
+
+    <section class="slide title-slide">
+      <div class="title-slide-content">
+        <p class="eyebrow">ENG-654 · Session 2 · Lecture 2</p>
+        <h1 class="course-title">Representative Wrist-Partitioned 6R and 7R Inverse Kinematics</h1>
+        <p class="subtitle">How do structure and redundancy change the inverse-kinematics problem?</p>
+      </div>
+    </section>
+
+    <section class="slide">
+      <h2 class="slide-title">Lecture scaffold</h2>
+      <div class="layout-40-60">
+        <div>
+          <p class="lead">Use this file as the starting point for this lecture.</p>
+          <p>The structure follows the uploaded slide-by-slide plan. Replace placeholders with final visuals, derivations, and animations.</p>
+        </div>
+        <div class="visual-container">
+          <img class="technical-figure" src="../assets/svg/robot_components.svg" alt="Robot components placeholder">
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <h2 class="slide-title">Reusable equation slide</h2>
+      <div class="layout-two-column">
+        <div>
+          <p class="lead">Explain the physical meaning first.</p>
+          <p>Then introduce the compact mathematical relation.</p>
+        </div>
+        <div class="equation">
+          \[
+          \boldsymbol{\xi}=J(\mathbf{q})\dot{\mathbf{q}}
+          \]
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <h2 class="slide-title">Step-by-step reveal</h2>
+      <div class="layout-three-column reveal-children">
+        <div class="example"><strong>1</strong><br>State the geometric idea.</div>
+        <div class="example"><strong>2</strong><br>Define the variables and frames.</div>
+        <div class="example"><strong>3</strong><br>Derive or visualize the result.</div>
+      </div>
+    </section>
+
+  </main>
+  <script src="../js/deck/nav-runtime.js"></script>
+  <script type="module" src="../js/main.js"></script>
+</body>
+</html>

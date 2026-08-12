@@ -289,6 +289,7 @@ body {
     justify-content: center;
     align-items: center;
     min-height: 0;
+    /* outline: 1px solid red; */
 }
 
 /* A reversed 60 40 layout */
@@ -302,10 +303,11 @@ body {
     align-items: center;
 }
 
-.figure-container {
+.visual-container {
     width: 100%;
     height: 100%;
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
     min-height: 0;
@@ -317,6 +319,9 @@ body {
     max-width: 100%;
     max-height: 100%;
     object-fit: contain;
+    align-items: center;
+    justify-content: center;
+    /* outline: 1px solid green; */
 }
 
 /* Minimal list presentation */
@@ -334,4 +339,184 @@ body {
 
 .minimal-list li::marker {
     color: var(--epfl-red);
+}
+
+/* Technical figure */
+.technical-figure {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+/* Normal figure */
+.photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Slide figure styling */
+.slide-figure {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: var(--vgap-xs);
+}
+
+.slide-figure figcaption {
+  font-size: var(--font-small);
+  color: #555;
+  text-align: center;
+}
+
+.tight-gap {
+  gap: var(--gap-sm);
+}
+
+.bleed-right {
+  margin-right: calc(-1 * var(--slide-padding-x));
+}
+
+/* robot svg */
+.robot-svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.robot-link {
+  stroke: var(--black);
+  stroke-width: 14;
+  stroke-linecap: round;
+}
+
+
+.robot-joint {
+  fill: var(--white);
+  stroke: var(--black);
+  stroke-width: 5;
+}
+
+
+.robot-ee {
+  fill: var(--epfl-red);
+  stroke: var(--black);
+  stroke-width: 3;
+}
+
+.world-axis {
+  stroke: #000000;
+  stroke-width: 2;
+  stroke-dasharray: 6 6;
+}
+
+
+.frame-label {
+  fill: var(--black);
+  font-size: 18px;
+}
+
+.axis-x {
+  stroke: var(--epfl-red);
+  stroke-width: 4;
+}
+
+
+.axis-y {
+  stroke: var(--science-green);
+  stroke-width: 4;
+}
+
+.ee-path {
+  fill: none;
+  stroke: var(--science-blue);
+  stroke-width: 3;
+  opacity: 0.7;
+}
+
+.joint-value {
+  fill: var(--black);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+/* 3D viewer */
+.three-viewer {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: white;
+  border: 1px solid #f01212;
+}
+
+.robot2r-interactive {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.robot2r-interactive .robot-svg {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+}
+
+.slider-row {
+  display: grid;
+
+  grid-template-columns:
+    3rem
+    1fr
+    4rem;
+  gap: var(--gap-sm);
+  align-items: center;
+}
+
+.slider-row input[type="range"] {
+  width: 100%;
+  cursor: pointer;
+}
+
+.slider-row label {
+  font-weight: 600;
+}
+
+.slider-row span {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* button for clearing path traced by the 2R robot */
+.control-buttons {
+  display: flex;
+
+  gap: var(--gap-sm);
+}
+
+.control-button {
+  align-self: flex-start;
+  padding:
+    0.6rem
+    1rem;
+  background: white;
+  color: black;
+  border:
+    1px solid
+    #cccccc;
+  border-radius: 0.4rem;
+  cursor: pointer;
+}
+
+.control-button:hover {
+  border-color: var(--epfl-red);
+  color: var(--epfl-red);
 }

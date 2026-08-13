@@ -127,7 +127,7 @@ body.mode-scroll .slide {
   font-size: var(--font-lead);
   line-height: 1.35;
   font-weight: 400;
-  max-width: 42ch;
+  /* max-width: 42ch; */
 }
 
 p {

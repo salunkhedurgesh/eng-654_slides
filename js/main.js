@@ -13,6 +13,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     async () => {
       const module = await import('./viz/threeRevolute.js');
       module.initThreeRevoluteDemos?.();
+    },
+    async () => {
+      const module = await import('./viz/frameDHPlayground.js');
+      module.initFrameDHPlaygrounds?.();
     }
   ];
 

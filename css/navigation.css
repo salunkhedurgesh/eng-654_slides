@@ -70,11 +70,46 @@
   transform: scale(0.94);
 }
 
-/* Keep these legacy classes harmless if older HTML/JS still contains them. */
+/* Keep these legacy navigation progress elements harmless if older HTML/JS still contains them. */
 .deck-progress,
 .deck-progress-bar,
-.slide-counter {
+.deck-nav .slide-counter {
   display: none;
+}
+
+.slide-number {
+  position: absolute;
+  left: clamp(0.9rem, 2vw, 1.5rem);
+  bottom: clamp(0.85rem, 1.8vh, 1.35rem);
+  z-index: 80;
+
+  color: rgba(0, 0, 0, 0.34);
+  font-size: clamp(0.65rem, 0.75vw, 0.9rem);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+
+  pointer-events: none;
+  user-select: none;
+}
+
+.slide-number::before {
+  content: '';
+  display: inline-block;
+  width: clamp(1.2rem, 2.4vw, 2rem);
+  height: 1px;
+  margin-right: 0.55rem;
+  vertical-align: middle;
+  background: rgba(255, 0, 0, 0.45);
+}
+
+.title-slide .slide-number {
+  color: rgba(0, 0, 0, 0.26);
+}
+
+body.mode-scroll .slide-number {
+  position: absolute;
 }
 
 body.mode-scroll .deck-nav {

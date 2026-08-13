@@ -85,3 +85,8 @@ Navigation is handled by `js/deck/nav-runtime.js`, a plain non-module script. Th
 - F: fullscreen
 - Bottom bar buttons: previous, next, scroll/deck toggle, fullscreen
 
+
+
+## Slide numbers
+
+Slide numbers are injected automatically by `js/deck/nav-runtime.js` as a subtle overlay in the bottom-left corner. To hide the number on a particular slide, add `data-slide-number="off"` to that `<section class="slide">`.

@@ -11,6 +11,7 @@ export function initDeckNavigation() {
   const revealedSteps = new Map();
 
   prepareFragments(slides);
+  createSlideNumbers();
   createNav();
   update();
 
@@ -31,6 +32,22 @@ export function initDeckNavigation() {
         el.dataset.fragmentIndex = String(i + 1);
       });
       revealedSteps.set(slide, 0);
+    });
+  }
+
+  function createSlideNumbers() {
+    slides.forEach((slide, i) => {
+      if (slide.dataset.slideNumber === 'off') return;
+
+      let number = slide.querySelector(':scope > .slide-number');
+      if (!number) {
+        number = document.createElement('div');
+        number.className = 'slide-number';
+        slide.appendChild(number);
+      }
+
+      number.textContent = String(i + 1).padStart(2, '0') + ' / ' + String(slides.length).padStart(2, '0');
+      number.setAttribute('aria-label', 'Slide ' + (i + 1) + ' of ' + slides.length);
     });
   }
 
@@ -100,6 +117,8 @@ export function initDeckNavigation() {
   function update() {
     slides.forEach((slide, i) => {
       slide.classList.toggle('active', i === index);
+      const number = slide.querySelector(':scope > .slide-number');
+      if (number) number.classList.toggle('is-current', i === index);
       applyFragments(slide);
     });
 

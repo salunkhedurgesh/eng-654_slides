@@ -5,21 +5,24 @@
 */
 
 document.addEventListener('DOMContentLoaded', async () => {
+  // Keep the visualization module graph on one revision. This prevents browsers
+  // from mixing a newly edited demo with stale cached dependencies.
+  const revision = '20260814';
   const loaders = [
     async () => {
-      const module = await import('./viz/robot2r.js');
+      const module = await import(`./viz/robot2r.js?v=${revision}`);
       module.initRobot2R?.();
     },
     async () => {
-      const module = await import('./viz/threeRevolute.js');
+      const module = await import(`./viz/threeRevolute.js?v=${revision}`);
       module.initThreeRevoluteDemos?.();
     },
     async () => {
-      const module = await import('./viz/frameDHPlayground.js');
+      const module = await import(`./viz/frameDHPlayground.js?v=${revision}`);
       module.initFrameDHPlaygrounds?.();
     },
     async () => {
-      const module = await import('./viz/poeUrdfPlayground.js');
+      const module = await import(`./viz/poeUrdfPlayground.js?v=${revision}`);
       module.initPoeUrdfPlaygrounds?.();
     }
   ];

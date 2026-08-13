@@ -198,6 +198,54 @@
 .l2-matrix td:last-child { background: #fafafa; font-weight: 700; }
 .l2-vector { margin: 0.35rem 0 0; padding: 0.35rem; background: #fafafa; font-family: ui-monospace, monospace; font-variant-numeric: tabular-nums; }
 
+.rotation2d-demo {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(13rem, 1fr) auto auto;
+  gap: 0.42rem;
+  font-size: clamp(0.72rem, 0.82vw, 0.92rem);
+}
+.rotation2d-canvas-wrap {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: #fafafa;
+}
+.rotation2d-canvas-wrap canvas { display: block; width: 100%; height: 100%; }
+.rotation2d-legend {
+  position: absolute;
+  left: 0.45rem;
+  bottom: 0.35rem;
+  margin: 0;
+  padding: 0.25rem 0.35rem;
+  background: rgba(255,255,255,.9);
+  color: var(--muted);
+  font-size: 0.88em;
+}
+.world-key { color: #666; font-weight: 800; }
+.body-key { color: var(--epfl-red); font-weight: 800; }
+.rotation2d-controls {
+  display: grid;
+  grid-template-columns: auto auto minmax(7rem, 1fr) 3.5rem;
+  gap: 0.42rem;
+  align-items: center;
+}
+.rotation2d-controls label { font-weight: 800; }
+.rotation2d-controls input { width: 100%; }
+.rotation2d-controls output { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+.rotation2d-readout {
+  display: grid;
+  grid-template-columns: auto minmax(10rem, 1fr);
+  gap: 0.55rem;
+  align-items: center;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--line);
+}
+.rotation2d-readout .l2-matrix { margin: 0; }
+
 .poe-factor-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.25rem; margin-top: 0.4rem; }
 .poe-factor { padding: 0.32rem; border-top: 2px solid var(--black); background: #fafafa; text-align: center; }
 .poe-factor.is-active { border-top-color: var(--epfl-red); }

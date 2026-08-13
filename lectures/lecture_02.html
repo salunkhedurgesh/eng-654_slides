@@ -57,6 +57,26 @@
       </div>
     </section>
 
+    <section class="slide interactive-slide">
+      <p class="slide-kicker">Act I · A 2D warm-up</p>
+      <h2 class="slide-title">Constant angular velocity naturally produces an exponential</h2>
+      <p class="slide-subtitle">Before using a \(3\times3\) or \(4\times4\) matrix exponential, follow one point and one frame rotating in the plane.</p>
+      <div class="layout-40-60">
+        <div>
+          <p>Define the \(90^\circ\) rotation generator</p>
+          <div class="equation">\[J=\begin{bmatrix}0&-1\\1&0\end{bmatrix},\qquad J\mathbf p=\hat z\times\mathbf p.\]</div>
+          <div class="reveal-children">
+            <p><strong>Instantaneous motion:</strong> \(\dot{\mathbf p}(t)=\omega J\mathbf p(t)\).</p>
+            <p><strong>Accumulate small rotations:</strong> \(\mathbf p(t+\Delta t)\approx(I+\omega J\Delta t)\mathbf p(t)\).</p>
+            <p><strong>Take the continuous limit:</strong></p>
+          </div>
+          <div class="equation">\[\mathbf p(t)=e^{\omega Jt}\mathbf p(0)=e^{J\theta}\mathbf p(0),\qquad\theta=\omega t.\]</div>
+        </div>
+        <div class="visual-container"><div data-rotation2d-demo></div></div>
+      </div>
+      <p class="slide-takeaway"><strong>Takeaway:</strong> the exponential is not arbitrary notation—it is what repeated infinitesimal rotations converge to.</p>
+    </section>
+
     <section class="slide">
       <p class="slide-kicker">Act I · From rate to motion</p>
       <h2 class="slide-title">The exponential answers a time-evolution question</h2>

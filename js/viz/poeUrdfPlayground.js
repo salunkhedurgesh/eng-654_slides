@@ -6,6 +6,7 @@ const DEG = Math.PI / 180;
 const EPS = 1e-8;
 
 export function initPoeUrdfPlaygrounds() {
+  initAll('[data-rotation2d-demo]', createRotation2DDemo);
   initAll('[data-screw-exponential-demo]', createScrewExponentialDemo);
   initAll('[data-screw-frame-demo]', createScrewFrameDemo);
   initAll('[data-custom3r-poe-demo]', createCustom3RPoeDemo);
@@ -106,13 +107,92 @@ function expRevolute(omega, point, theta, pitch = 0) {
   return rotation;
 }
 
+function createRotation2DDemo(container) {
+  container.className = 'rotation2d-demo';
+  const controlId = 'rotation2d-theta-' + Math.random().toString(36).slice(2,8);
+  container.innerHTML = `
+    <div class="rotation2d-canvas-wrap">
+      <canvas aria-label="Animated two-dimensional rotation"></canvas>
+      <p class="rotation2d-legend"><span class="world-key">W</span> fixed frame · <span class="body-key">B</span> rotating frame · green arrow \\(\\dot{\\mathbf p}\\)</p>
+    </div>
+    <div class="rotation2d-controls">
+      <button class="control-button" data-play type="button">Play</button>
+      <label for="${controlId}">θ</label>
+      <input id="${controlId}" data-angle type="range" min="-360" max="360" step="1" value="45">
+      <output data-angle-out>45°</output>
+    </div>
+    <div class="rotation2d-readout">
+      <strong>\\(R(\\theta)=e^{J\\theta}\\)</strong>
+      <table class="l2-matrix"><tbody data-r2-matrix></tbody></table>
+    </div>`;
+  const canvas = container.querySelector('canvas'), context = canvas.getContext('2d');
+  const angleInput = container.querySelector('[data-angle]'), playButton = container.querySelector('[data-play]');
+  let playing = false, lastTime = 0;
+
+  function arrow(origin, vector, color, label, width = 4) {
+    const end = { x: origin.x + vector.x, y: origin.y + vector.y };
+    context.strokeStyle = color; context.fillStyle = color; context.lineWidth = width;
+    context.beginPath(); context.moveTo(origin.x, origin.y); context.lineTo(end.x, end.y); context.stroke();
+    const angle = Math.atan2(end.y - origin.y, end.x - origin.x), head = 10;
+    context.beginPath(); context.moveTo(end.x, end.y);
+    context.lineTo(end.x - head * Math.cos(angle - .45), end.y - head * Math.sin(angle - .45));
+    context.lineTo(end.x - head * Math.cos(angle + .45), end.y - head * Math.sin(angle + .45));
+    context.closePath(); context.fill();
+    context.font = '700 14px Arial'; context.fillText(label, end.x + 6, end.y - 6);
+  }
+
+  function draw() {
+    const rect = canvas.getBoundingClientRect(), dpr = Math.min(devicePixelRatio || 1, 2);
+    const width = Math.max(1, Math.round(rect.width * dpr)), height = Math.max(1, Math.round(rect.height * dpr));
+    if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
+    context.setTransform(dpr, 0, 0, dpr, 0, 0); context.clearRect(0, 0, rect.width, rect.height);
+    const origin = { x: rect.width * .46, y: rect.height * .54 }, radius = Math.min(rect.width, rect.height) * .3;
+    const theta = Number(angleInput.value) * DEG;
+    context.strokeStyle = '#dddddd'; context.lineWidth = 1;
+    for (let i = -4; i <= 4; i += 1) {
+      context.beginPath(); context.moveTo(origin.x + i * 35, 20); context.lineTo(origin.x + i * 35, rect.height - 20); context.stroke();
+      context.beginPath(); context.moveTo(20, origin.y + i * 35); context.lineTo(rect.width - 20, origin.y + i * 35); context.stroke();
+    }
+    context.strokeStyle = '#b8b8b8'; context.lineWidth = 2; context.beginPath(); context.arc(origin.x, origin.y, radius, 0, Math.PI * 2); context.stroke();
+    arrow(origin, {x: radius * .72, y: 0}, '#777777', 'x_W', 3);
+    arrow(origin, {x: 0, y: -radius * .72}, '#777777', 'y_W', 3);
+    arrow(origin, {x: radius * .72 * Math.cos(theta), y: -radius * .72 * Math.sin(theta)}, '#ff3030', 'x_B');
+    arrow(origin, {x: radius * .72 * Math.sin(theta), y: radius * .72 * Math.cos(theta)}, '#2775ff', 'y_B');
+    const point = {x: origin.x + radius * Math.cos(theta), y: origin.y - radius * Math.sin(theta)};
+    context.fillStyle = '#111111'; context.beginPath(); context.arc(point.x, point.y, 6, 0, Math.PI * 2); context.fill();
+    context.font = '700 15px Arial'; context.fillText('P', point.x + 8, point.y - 8);
+    arrow(point, {x: -55 * Math.sin(theta), y: -55 * Math.cos(theta)}, '#35a853', 'ṗ', 3);
+    context.fillStyle = '#111'; context.beginPath(); context.arc(origin.x, origin.y, 5, 0, Math.PI * 2); context.fill();
+    context.font = '700 14px Arial'; context.fillText('O', origin.x - 18, origin.y + 18);
+    container.querySelector('[data-angle-out]').textContent = angleInput.value + '°';
+    const rows = matrixRows(new THREE.Matrix4().makeRotationZ(theta)).slice(0,2).map((row) => row.slice(0,2));
+    container.querySelector('[data-r2-matrix]').innerHTML = rows.map((row) => `<tr>${row.map((v) => `<td>${format(v,3)}</td>`).join('')}</tr>`).join('');
+  }
+
+  function animate(time) {
+    if (playing) {
+      if (lastTime) {
+        let angle = Number(angleInput.value) + (time - lastTime) * .055;
+        if (angle > 360) angle = -360;
+        angleInput.value = angle;
+      }
+      lastTime = time; draw();
+    } else lastTime = 0;
+    requestAnimationFrame(animate);
+  }
+  angleInput.addEventListener('input', draw);
+  playButton.addEventListener('click', () => { playing = !playing; playButton.textContent = playing ? 'Pause' : 'Play'; });
+  new ResizeObserver(draw).observe(canvas);
+  draw(); requestAnimationFrame(animate); typeset(container);
+}
+
 function createScrewExponentialDemo(container) {
   container.className = 'l2-demo screw-exponential-demo';
   container.innerHTML = `
     <div class="l2-stage"><p class="l2-stage-note">red line: screw axis · drag to orbit</p></div>
     <div class="l2-panel">
       <div class="l2-card"><strong>Screw parameters</strong>
-        <div class="l2-control"><label>θ</label><input data-theta type="range" min="-180" max="180" value="90"><output data-theta-out>90°</output></div>
+        <div class="l2-control"><label>θ</label><input data-theta type="range" min="-360" max="360" value="90"><output data-theta-out>90°</output></div>
         <div class="l2-control"><label>pitch h</label><input data-pitch type="range" min="-0.6" max="0.6" step="0.02" value="0.2"><output data-pitch-out>0.20</output></div>
       </div>
       <div class="l2-card"><strong>Twist</strong><p class="l2-vector" data-twist></p></div>
@@ -122,6 +202,7 @@ function createScrewExponentialDemo(container) {
   const axisPoint = new THREE.Vector3(0.65, 0, 0), omega = new THREE.Vector3(0, 0, 1);
   kit.world.add(line([new THREE.Vector3(.65,0,-1.5), new THREE.Vector3(.65,0,2.8)], 0xff0000));
   const axisLabel = sprite('screw axis', true); axisLabel.position.set(.82, 0, 2.3); kit.world.add(axisLabel);
+  const worldFrame = frame('W', 0.72); worldFrame.group.matrix.identity(); kit.world.add(worldFrame.group);
   const moving = frame('B', 0.72, true); kit.world.add(moving.group);
   let path = line([], 0x222222, 0.6); kit.world.add(path);
   const thetaInput = container.querySelector('[data-theta]'), pitchInput = container.querySelector('[data-pitch]');

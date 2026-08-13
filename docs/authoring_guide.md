@@ -39,6 +39,16 @@ T(q)=e^{[S_1]q_1}\cdots e^{[S_n]q_n}M
 </div>
 ```
 
+### Notation-first rule
+
+Declare every symbol and index convention on a slide before the first slide that uses it.
+For frame notation, explicitly define:
+
+- what each frame label means;
+- whether a bold symbol represents a point coordinate, direction vector, or translation;
+- what left superscripts and right subscripts identify;
+- the source and destination frames of every rotation or transformation matrix.
+
 ## Step-by-step reveals
 
 Add `reveal-children` to a grid/flex container:

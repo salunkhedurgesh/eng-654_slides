@@ -3,13 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Introduction, Frames, Transformations, and DH Modelling — ENG-654</title>
+  <title>Frames, Transformations, and DH Modelling — ENG-654</title>
+
   <link rel="stylesheet" href="../css/base.css">
   <link rel="stylesheet" href="../css/layouts.css">
   <link rel="stylesheet" href="../css/components.css">
   <link rel="stylesheet" href="../css/reveal.css">
   <link rel="stylesheet" href="../css/navigation.css">
   <link rel="stylesheet" href="../css/viz.css">
+  <link rel="stylesheet" href="../css/dh-playground.css">
 
   <script>
     window.MathJax = {
@@ -36,87 +38,466 @@
     <section class="slide title-slide">
       <div class="title-slide-content">
         <p class="eyebrow">ENG-654 · Session 1 · Lecture 1</p>
-        <h1 class="course-title">Introduction, Frames, Transformations, and DH Modelling</h1>
-        <p class="subtitle">How do we convert a physical robot into a reproducible mathematical model?</p>
+        <h1 class="course-title dh-lecture-title">Frames, Transformations &amp; DH Modelling</h1>
+        <p class="subtitle">How do we turn robot geometry into a reproducible kinematic model?</p>
       </div>
     </section>
 
     <section class="slide">
-      <h2 class="slide-title">Opening motivation: reachable is not always executable</h2>
+      <h2 class="slide-title">Read the notation before using a frame transformation</h2>
+      <div class="layout-two-column divided">
+        <div>
+          <div class="definition">
+            <strong>Frames and geometric objects</strong>
+            <p><strong>\(W\)</strong> is the fixed world—or reference—frame.</p>
+            <p><strong>\(B\)</strong> is a moving body frame.</p>
+            <p><strong>\(A,B,C\)</strong> denote generic frames when no frame is privileged as world.</p>
+            <p><strong>\(P\)</strong> names one physical point in space.</p>
+          </div>
+          <div class="clean-callout">
+            An italic capital names a geometric object or frame; it is not a coordinate value.
+          </div>
+        </div>
+        <div>
+          <div class="definition">
+            <strong>Coordinates and transformations</strong>
+            <p>\(\mathbf p\) is a point-coordinate vector; \(\mathbf v\) is a direction vector.</p>
+            <p>In \({}^{W}\mathbf p_{P}\), the left superscript says “expressed in \(W\),” while the subscript identifies point \(P\).</p>
+            <p>A tilde, as in \(\widetilde{\mathbf p}\), marks the four-coordinate homogeneous representation.</p>
+            <p>\({}^{W}\mathbf t_{B}\) locates the origin of \(B\), expressed in \(W\).</p>
+            <p>\({}^{W}R_{B}\) is the orientation of \(B\) expressed in \(W\).</p>
+            <p>\({}^{W}T_{B}\) is the coordinate map from frame \(B\) to frame \(W\).</p>
+          </div>
+        </div>
+      </div>
+      <div class="equation">
+        \[
+        {}^{W}\widetilde{\mathbf p}_{P}
+        =
+        {}^{W}T_{B}\,{}^{B}\widetilde{\mathbf p}_{P}
+        \]
+      </div>
+    </section>
+
+    <section class="slide">
+      <h2 class="slide-title">A coordinate is incomplete until its reference frame is named</h2>
+      <div class="layout-two-column divided">
+        <div>
+          <p class="lead">The numbers \([0.4,\,0.2,\,0.1]^T\) do not locate a point by themselves.</p>
+          <div class="reveal-children">
+            <p>We must know the <strong>origin</strong> from which the coordinates are measured.</p>
+            <p>We must know the <strong>directions of the three basis axes</strong>.</p>
+            <p>The same physical point therefore has different coordinate vectors in different frames.</p>
+          </div>
+        </div>
+        <div class="layout-center">
+          <div>
+            <div class="definition">
+              <strong>Coordinate frame</strong><br>
+              An origin plus an ordered, right-handed orthonormal basis \((\hat x,\hat y,\hat z)\).
+            </div>
+            <div class="equation">\[{}^{A}\mathbf p_P \neq {}^{B}\mathbf p_P \quad \text{in general}\]</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <h2 class="slide-title">Move frame B and watch one physical point acquire new world coordinates</h2>
+      <div class="layout-full">
+        <div class="visual-container">
+          <div data-frame-pose-demo></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <h2 class="slide-title">A rotation matrix is three axes written in another frame</h2>
       <div class="layout-40-60">
         <div>
-          <p class="lead">A pose can be reachable while a path to it is not safely executable.</p>
+          <p class="lead">The columns of \\({}^{A}R_B\\) are the axes of frame B expressed in frame A.</p>
+          <div class="equation">
+            \[
+            {}^{A}R_B=
+            \begin{bmatrix}
+            | & | & |\\
+            {}^{A}\hat x_B & {}^{A}\hat y_B & {}^{A}\hat z_B\\
+            | & | & |
+            \end{bmatrix}
+            \]
+          </div>
+        </div>
+        <div class="reveal-children">
+          <div class="clean-callout"><strong>Orthogonal:</strong> \\({}^{A}R_B^T{}^{A}R_B=I\\).</div>
+          <div class="clean-callout"><strong>Right-handed:</strong> \\(\det({}^{A}R_B)=+1\\).</div>
+          <div class="clean-callout"><strong>Inverse:</strong> \\({}^{B}R_A=({}^{A}R_B)^T\\).</div>
+          <p class="lead">Interpret the columns geometrically before memorizing matrix identities.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <h2 class="slide-title">Homogeneous coordinates distinguish points from direction vectors</h2>
+      <div class="layout-two-column divided">
+        <div>
+          <p class="lead">Projective 3-space uses four coordinates, with the last coordinate denoted by \(w\).</p>
+          <div class="equation">
+            \[
+            \widetilde{\mathbf p}
+            =
+            \begin{bmatrix}\mathbf p\\1\end{bmatrix}
+            \quad\text{is a finite point},
+            \qquad
+            \widetilde{\mathbf v}
+            =
+            \begin{bmatrix}\mathbf v\\0\end{bmatrix}
+            \quad\text{is a direction}.
+            \]
+          </div>
+          <p>The tilde marks a homogeneous representation; \(\mathbf p,\mathbf v\in\mathbb R^3\).</p>
+        </div>
+        <div class="reveal-children">
+          <div class="definition">
+            <strong>Why “homogeneous”?</strong><br>
+            Every nonzero scalar multiple represents the same projective point:
+            \[
+            [x:y:z:w]=[\lambda x:\lambda y:\lambda z:\lambda w],
+            \qquad \lambda\neq0.
+            \]
+          </div>
+          <p>A finite point has \(w\neq0\) and can be normalized to \(w=1\).</p>
+          <p>A direction has \(w=0\), so it lies at infinity and has no finite location.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <h2 class="slide-title">Translation is not a 3D orthogonal transformation</h2>
+      <div class="layout-two-column divided">
+        <div>
+          <p class="lead">A \(3\times3\) rotation matrix \(R\) is linear and orthogonal:</p>
+          <div class="equation">
+            \[
+            R^TR=I,
+            \qquad
+            R\mathbf 0=\mathbf 0.
+            \]
+          </div>
+          <p>Every linear map must keep the origin fixed.</p>
+        </div>
+        <div>
+          <p class="lead">A translation by \(\mathbf t\) is affine:</p>
+          <div class="equation">
+            \[
+            \mathbf p'=\mathbf p+\mathbf t,
+            \qquad
+            \mathbf 0\mapsto\mathbf t.
+            \]
+          </div>
+          <p>If \(\mathbf t\neq\mathbf0\), no \(3\times3\) linear—or orthogonal—matrix can perform this operation.</p>
+        </div>
+      </div>
+      <div class="clean-callout">
+        We therefore lift 3D coordinates into four dimensions so rotation and translation can act through one linear matrix multiplication.
+      </div>
+    </section>
+
+    <section class="slide">
+      <h2 class="slide-title">The affine point equation determines the homogeneous matrix</h2>
+      <div class="layout-two-column divided">
+        <div>
+          <p class="lead">Let \({}^{W}\mathbf t_{B}\) be the position of the origin of \(B\), expressed in \(W\). Then</p>
+          <div class="equation">
+            \[
+            {}^{W}\mathbf p_{P}
+            =
+            {}^{W}R_{B}\,{}^{B}\mathbf p_{P}
+            +
+            {}^{W}\mathbf t_{B}.
+            \]
+          </div>
+          <p>Rotation is linear; translation is the added offset.</p>
+        </div>
+        <div>
+          <p class="lead">Append \(1\) to each point and choose the last row so that the fourth coordinate remains \(1\):</p>
+          <div class="equation">
+            \[
+            \begin{bmatrix}
+            {}^{W}\mathbf p_{P}\\1
+            \end{bmatrix}
+            =
+            \underbrace{
+            \begin{bmatrix}
+            {}^{W}R_{B} & {}^{W}\mathbf t_{B}\\
+            \mathbf0^T & 1
+            \end{bmatrix}}_{{}^{W}T_{B}}
+            \begin{bmatrix}
+            {}^{B}\mathbf p_{P}\\1
+            \end{bmatrix}.
+            \]
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <h2 class="slide-title">A homogeneous transform stores both orientation and origin</h2>
+      <div class="layout-two-column divided">
+        <div class="layout-center">
+          <div>
+            <div class="definition">
+              A <strong>homogeneous transformation</strong> is the \(4\times4\) linear representation of a 3D affine rigid transformation acting on homogeneous coordinates.
+            </div>
+            <div class="equation">
+              \[
+              {}^{A}T_B=
+              \begin{bmatrix}
+              {}^{A}R_B & {}^{A}\mathbf t_B\\
+              \mathbf 0^T & 1
+              \end{bmatrix}.
+              \]
+            </div>
+          </div>
+        </div>
+        <div class="reveal-children">
+          <p><strong>Rotation:</strong> how the axes of B are oriented when seen from A.</p>
+          <p><strong>Translation:</strong> where the origin of B is located when measured in A.</p>
+          <p><strong>Bottom row:</strong> lets rotation and translation be composed by one matrix product.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <h2 class="slide-title">A transform re-expresses a point without moving the physical point</h2>
+      <div class="layout-two-column">
+        <div>
+          <p class="lead">If the coordinates of P are known in frame B, then</p>
+          <div class="equation">
+            \[
+            \begin{bmatrix}{}^{A}\mathbf p_P\\1\end{bmatrix}
+            ={}^{A}T_B
+            \begin{bmatrix}{}^{B}\mathbf p_P\\1\end{bmatrix}.
+            \]
+          </div>
           <div class="reveal-children">
-            <p>One pose may admit several joint solutions.</p>
-            <p>A Cartesian line may cross a joint limit or singular region.</p>
-            <p>Planning must respect the geometry of the robot, not only the endpoint.</p>
+            <p>The coordinate vector changes.</p>
+            <p>The physical point does not.</p>
+            <p>This distinction is essential when reading robot models.</p>
+          </div>
+        </div>
+        <div class="layout-center">
+          <div class="definition">
+            <strong>Read the notation aloud:</strong><br>
+            “Pose of frame B <em>expressed in</em> frame A.”
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <h2 class="slide-title">Transform composition follows a path through frame labels</h2>
+      <div class="transform-path reveal-children">
+        <div class="transform-node active"><strong>Frame A</strong><br><span class="small-text">reference</span></div>
+        <div class="transform-arrow">→</div>
+        <div class="transform-node"><strong>Frame B</strong><br><span class="small-text">intermediate</span></div>
+        <div class="transform-arrow">→</div>
+        <div class="transform-node active"><strong>Frame C</strong><br><span class="small-text">target</span></div>
+      </div>
+      <div class="equation">
+        \[{}^{A}T_C = {}^{A}T_B\,{}^{B}T_C\]
+      </div>
+      <p class="lead" style="margin-inline:auto;text-align:center;">The repeated frame B is the compatible intermediate frame.</p>
+    </section>
+
+    <section class="slide">
+      <h2 class="slide-title">Rigid transformations do not commute: changing the order changes the motion</h2>
+      <div class="layout-two-column divided">
+        <div>
+          <div class="equation">
+            \[
+            R_z(90^\circ)\,T_x(1)
+            \]
+          </div>
+          <p class="lead">Translate along the <em>already rotated</em> x-direction.</p>
+        </div>
+        <div>
+          <div class="equation">
+            \[
+            T_x(1)\,R_z(90^\circ)
+            \]
+          </div>
+          <p class="lead">Translate first, then rotate the body about its new origin.</p>
+        </div>
+      </div>
+      <div class="clean-callout"><strong>Concept check:</strong> which operation acts first on a column vector? Read products from right to left as operations, but read frame indices as a path.</div>
+    </section>
+
+    <section class="slide">
+      <h2 class="slide-title">Forward kinematics is repeated frame composition along the serial chain</h2>
+      <div class="layout-40-60">
+        <div>
+          <p class="lead">For a serial robot, each joint contributes one relative transform.</p>
+          <div class="equation">
+            \[
+            {}^{0}T_n(q)=
+            {}^{0}T_1(q_1)
+            {}^{1}T_2(q_2)\cdots
+            {}^{n-1}T_n(q_n).
+            \]
+          </div>
+          <div class="reveal-children">
+            <p><strong>Input:</strong> joint coordinates \\(q\\).</p>
+            <p><strong>Output:</strong> tool position and orientation.</p>
+            <p>The only remaining question is how to describe every relative transform systematically.</p>
           </div>
         </div>
         <div class="visual-container">
-          <img class="technical-figure" src="../assets/svg/certified_pipeline.svg" alt="Certified planning pipeline">
-        </div>
-      </div>
-    </section>
-
-    <section class="slide">
-      <h2 class="slide-title">The four-session narrative</h2>
-      <div class="layout-four-step reveal-children" style="display:grid;grid-template-columns:repeat(4,1fr);gap:var(--gap-md);flex:1;align-items:center;">
-        <div class="definition"><strong>Read</strong><br>links, joints, frames, limits</div>
-        <div class="definition"><strong>Solve</strong><br>FK, IK, branch structure</div>
-        <div class="definition"><strong>Understand</strong><br>Jacobians, singularities, aspects</div>
-        <div class="definition"><strong>Plan</strong><br>certified feasible motion</div>
-      </div>
-    </section>
-
-    <section class="slide">
-      <h2 class="slide-title">Configuration and configuration space</h2>
-      <div class="layout-40-60">
-        <div>
-          <p class="lead">For an \(n\)-joint serial robot, one configuration is a vector</p>
-          <div class="equation">\[\mathbf{q}=[q_1,\ldots,q_n]^T.\]</div>
-          <p>The configuration space is the set of all admissible joint vectors.</p>
-        </div>
-        <div class="visual-container">
-          <div data-robot2r data-q1="45" data-q2="60" data-trace="true"></div>
-        </div>
-      </div>
-    </section>
-
-    <section class="slide">
-      <h2 class="slide-title">Coordinate frames are part of the model</h2>
-      <div class="layout-60-40">
-        <div class="visual-container">
           <div data-three-revolute></div>
         </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <h2 class="slide-title">DH works by restricting where consecutive robot frames are allowed to sit</h2>
+      <div class="layout-two-column divided">
         <div>
-          <p class="lead">The same physical point has different numerical coordinates in different frames.</p>
-          <p>In all Three.js course visualizations, the robotics world is <strong>z-up</strong>. The root group is rotated by \(R_x(-\pi/2)\).</p>
-          <div class="equation">\[R(q)=e^{[\boldsymbol{\omega}]q}\]</div>
+          <p class="lead">A completely free rigid transform has six degrees of freedom.</p>
+          <div class="equation">\[SE(3):\quad 3\ \text{translations}+3\ \text{rotations}\]</div>
+          <p>That freedom is useful, but it makes a serial robot difficult to tabulate consistently.</p>
+        </div>
+        <div>
+          <p class="lead">DH chooses consecutive frames around the joint axes and common normal so that only four numbers remain.</p>
+          <div class="equation">\[(a_i,\alpha_i,d_i,\theta_i)\]</div>
+          <div class="definition"><strong>Purpose of DH:</strong> reproducible frame assignment and a compact link-by-link table.</div>
         </div>
       </div>
     </section>
 
     <section class="slide">
-      <h2 class="slide-title">Homogeneous transformations</h2>
+      <h2 class="slide-title">One standard-DH transform is four elementary motions in a fixed order</h2>
+      <div class="equation">
+        \[
+        {}^{i-1}T_i = R_z(\theta_i)\,T_z(d_i)\,T_x(a_i)\,R_x(\alpha_i)
+        \]
+      </div>
+      <div class="dh-convention-strip reveal-children">
+        <div class="dh-convention-step is-accent"><strong>1 · \\(\theta_i\\)</strong>Rotate about \\(z_{i-1}\\).</div>
+        <div class="dh-convention-step"><strong>2 · \\(d_i\\)</strong>Translate along \\(z_{i-1}\\).</div>
+        <div class="dh-convention-step"><strong>3 · \\(a_i\\)</strong>Translate along the common normal x.</div>
+        <div class="dh-convention-step"><strong>4 · \\(\alpha_i\\)</strong>Rotate about x to align the next z-axis.</div>
+      </div>
+      <p class="lead" style="margin-inline:auto;text-align:center;">The order is part of the convention. Mixing conventions produces a different model.</p>
+    </section>
+
+    <section class="slide">
+      <h2 class="slide-title">Each DH parameter answers a different geometric question</h2>
+      <div class="dh-parameter-grid reveal-children">
+        <div class="dh-parameter-item"><strong>\\(a_i\\)</strong><p>How far apart are the two joint axes along their common normal?</p></div>
+        <div class="dh-parameter-item"><strong>\\(\alpha_i\\)</strong><p>How much must one joint axis twist about the common normal to align with the next?</p></div>
+        <div class="dh-parameter-item"><strong>\\(d_i\\)</strong><p>How far do we move along \\(z_{i-1}\\) before reaching the common normal?</p></div>
+        <div class="dh-parameter-item"><strong>\\(\theta_i\\)</strong><p>How much do we rotate about \\(z_{i-1}\\) before the common normal is aligned?</p></div>
+      </div>
+      <div class="clean-callout"><strong>Revolute joint:</strong> \\(\theta_i\\) varies. <strong>Prismatic joint:</strong> \\(d_i\\) varies.</div>
+    </section>
+
+    <section class="slide">
+      <h2 class="slide-title">Interactive lab: build frames, set DH values, infer parameters, and remove frames</h2>
+      <div class="layout-full">
+        <div class="visual-container">
+          <div data-frame-dh-playground></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <h2 class="slide-title">A pair of arbitrary frames may not admit one exact standard-DH transform</h2>
       <div class="layout-two-column divided">
-        <div class="equation">
-          \[
-          {^A T_B}=\begin{bmatrix}
-          {^A R_B} & {^A\mathbf{p}_B}\\
-          \mathbf{0}^T & 1
-          \end{bmatrix}
-          \]
+        <div>
+          <p class="lead">The playground computes the best standard-DH decomposition of \\({}^{A}T_B\\).</p>
+          <div class="equation">
+            \[
+            \widehat T_{DH}=R_z(\hat\theta)T_z(\hat d)T_x(\hat a)R_x(\hat\alpha)
+            \]
+          </div>
+          <p>If the residual \\(\|{}^{A}T_B-\widehat T_{DH}\|\\) is not near zero, the selected frame pair does not satisfy the standard-DH placement constraints.</p>
         </div>
         <div class="reveal-children">
-          <p><strong>Rotation block:</strong> orientation of frame \(B\) expressed in frame \(A\).</p>
-          <p><strong>Translation block:</strong> position of the origin of \(B\) expressed in frame \(A\).</p>
-          <p><strong>Compatibility rule:</strong> repeated frame indices must match during composition.</p>
+          <div class="clean-callout"><strong>Try 1:</strong> select a parent and its direct DH child → residual should be essentially zero.</div>
+          <div class="clean-callout"><strong>Try 2:</strong> select F0 and F2 in the custom_3R preset → two DH steps generally cannot be compressed into one DH step.</div>
+          <div class="clean-callout"><strong>Lesson:</strong> DH parameters belong to a <em>frame convention</em>, not merely to two arbitrary coordinate systems.</div>
         </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <h2 class="slide-title">The uploaded custom_3R chain has an exact compact standard-DH model</h2>
+      <div class="layout-full">
+        <div class="visual-container">
+          <div data-custom3r-dh-demo></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <h2 class="slide-title">The custom_3R table reproduces the URDF kinematics after one fixed base transform</h2>
+      <div class="layout-center" style="flex-direction:column;gap:var(--vgap-md);">
+        <table class="dh-table-large">
+          <thead>
+            <tr><th>i</th><th>\\(a_i\\) [m]</th><th>\\(\alpha_i\\)</th><th>\\(d_i\\) [m]</th><th>\\(\theta_i\\)</th></tr>
+          </thead>
+          <tbody>
+            <tr class="highlight-row"><td>1</td><td>1.00</td><td>−90°</td><td>0.00</td><td>\\(q_1\\)</td></tr>
+            <tr><td>2</td><td>2.00</td><td>+90°</td><td>1.25</td><td>\\(q_2\\)</td></tr>
+            <tr><td>3</td><td>1.50</td><td>0°</td><td>0.25</td><td>\\(q_3\\)</td></tr>
+          </tbody>
+        </table>
+        <div class="equation">
+          \[
+          {}^{W}T_{tool}=
+          T_z(1.0)\,A_1(q_1)A_2(q_2)A_3(q_3)
+          \]
+        </div>
+        <p class="lead" style="text-align:center;max-width:52ch;">The DH origin does not have to coincide with the URDF joint-origin point; it only has to lie on the same physical revolute axis and satisfy the DH frame convention.</p>
+      </div>
+    </section>
+
+    <section class="slide">
+      <h2 class="slide-title">A kinematic model is not trustworthy until it survives numerical validation</h2>
+      <div class="layout-two-column divided">
+        <div>
+          <p class="lead">For several configurations \\(q^{(k)}\\), compute the tool pose from every representation you claim is equivalent.</p>
+          <div class="equation">
+            \[
+            {}^{0}T_{tool,\,DH}(q^{(k)})
+            \stackrel{?}{=}
+            {}^{0}T_{tool,\,reference}(q^{(k)})
+            \]
+          </div>
+        </div>
+        <div class="reveal-children">
+          <p>Check the zero configuration first.</p>
+          <p>Then test random joint configurations.</p>
+          <p>Compare both position and orientation residuals.</p>
+          <p>Frame-sign and zero-offset mistakes often look plausible until this test.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <h2 class="slide-title">Takeaways: name the frame, compose carefully, then constrain the frames systematically</h2>
+      <div class="takeaway-stack reveal-children">
+        <div class="takeaway-row"><div class="takeaway-number">01</div><div><strong>Coordinates are frame-dependent.</strong> Always state what frame a vector or matrix is expressed in.</div></div>
+        <div class="takeaway-row"><div class="takeaway-number">02</div><div><strong>Homogeneous transforms compose along compatible frame labels.</strong> Order matters.</div></div>
+        <div class="takeaway-row"><div class="takeaway-number">03</div><div><strong>DH is a frame-assignment convention.</strong> The four parameters are meaningful only after the consecutive frames satisfy that convention.</div></div>
+        <div class="takeaway-row"><div class="takeaway-number">04</div><div><strong>Use the interactive lab as a falsification tool.</strong> A non-zero DH residual tells you the selected frame pair is not a valid one-step standard-DH relation.</div></div>
+        <div class="takeaway-row"><div class="takeaway-number">05</div><div><strong>Validate numerically.</strong> The next lecture will express the same robot using screw axes and URDF.</div></div>
       </div>
     </section>
 
   </main>
+
   <script src="../js/deck/nav-runtime.js"></script>
   <script type="module" src="../js/main.js"></script>
+  <script src="../js/viz/frameDHPlayground.js"></script>
 </body>
 </html>

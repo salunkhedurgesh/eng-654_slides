@@ -30,6 +30,10 @@ export function initFrameDHPlaygrounds() {
       fail(container, error);
     }
   });
+
+  document.querySelectorAll('[data-puma-frame-demo]').forEach((container) => {
+    createPumaFrameDemo(container).catch((error) => fail(container, error));
+  });
 }
 
 function fail(container, error) {
@@ -58,10 +62,12 @@ function createScene(stage, options = {}) {
   const robotWorld = createZUpWorld(scene);
   robotWorld.add(createGroundGrid(5.5, 0.5));
 
-  const worldAxes = createBoldAxes(0.75);
-  worldAxes.name = 'world-axes';
-  robotWorld.add(worldAxes);
-  robotWorld.add(createTextSprite('W', 0.24, { offset: [0.14, 0.14, 0.16], bold: true }));
+  if (options.worldFrame !== false) {
+    const worldAxes = createBoldAxes(0.75);
+    worldAxes.name = 'world-axes';
+    robotWorld.add(worldAxes);
+    robotWorld.add(createTextSprite('W', 0.24, { offset: [0.14, 0.14, 0.16], bold: true }));
+  }
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
@@ -266,11 +272,12 @@ function createFrameVisual(name, selected = false) {
 function setFrameVisualSelected(visual, selected) {
   visual.marker.material.color.setHex(selected ? 0xff0000 : 0x222222);
   const oldLabel = visual.label;
+  const labelPosition = oldLabel.position.clone();
   visual.group.remove(oldLabel);
   oldLabel.material.map?.dispose();
   oldLabel.material.dispose();
   visual.label = createTextSprite(visual.group.userData.frameName, 0.2, { accent: selected });
-  visual.label.position.set(0.13, 0.13, 0.16);
+  visual.label.position.copy(labelPosition);
   visual.group.add(visual.label);
 }
 
@@ -399,6 +406,205 @@ function createFramePoseDemo(container) {
 
   update();
   enableFramePicking(renderer.domElement, camera, [frameVisual], () => {});
+  typesetMath(container);
+}
+
+async function createPumaFrameDemo(container) {
+  container.classList.add('puma-frame-demo');
+  container.innerHTML = `
+    <div class="puma-frame-stage">
+      <p class="puma-frame-stage-note">PUMA · zero joint configuration · drag to orbit · scroll to zoom</p>
+    </div>
+    <div class="puma-frame-panel">
+      <div class="puma-frame-selectors">
+        <div class="dh-field">
+          <label for="puma-base-${uid(container)}">Base frame A</label>
+          <select id="puma-base-${uid(container)}" data-puma-base></select>
+        </div>
+        <div class="dh-field">
+          <label for="puma-target-${uid(container)}">Target frame B</label>
+          <select id="puma-target-${uid(container)}" data-puma-target></select>
+        </div>
+        <p class="dh-help">\\({}^{A}T_B\\) maps coordinates expressed in B into coordinates expressed in A. Frames F₁–F₆ are the six URDF joint-child frames.</p>
+      </div>
+      <div class="puma-transform-card" aria-live="polite">
+        <div class="puma-transform-heading">
+          <strong>Selected transform</strong>
+          <span data-puma-transform-name>world ← F₆</span>
+        </div>
+        <table class="pose-matrix" aria-label="Selected homogeneous transformation matrix">
+          <tbody data-puma-transform-matrix></tbody>
+        </table>
+      </div>
+      <div class="puma-display-controls">
+        <label class="dh-switch">
+          <input data-puma-meshes type="checkbox" checked>
+          <span class="dh-switch-track" aria-hidden="true"></span>
+          <span>Show STL robot</span>
+        </label>
+        <label class="puma-range-control">
+          <span>Frame marker size</span>
+          <input data-puma-marker-size type="range" min="25" max="120" step="5" value="65">
+          <output data-puma-marker-size-output>65%</output>
+        </label>
+        <label class="puma-range-control">
+          <span>STL opacity</span>
+          <input data-puma-opacity type="range" min="10" max="100" step="5" value="55">
+          <output data-puma-opacity-output>55%</output>
+        </label>
+      </div>
+    </div>
+  `;
+
+  const stage = container.querySelector('.puma-frame-stage');
+  const sceneKit = createScene(stage, { camera: [2.6, 2.2, 2.0], worldFrame: false });
+  const { robotWorld, camera, controls } = sceneKit;
+  const modelRoot = new URL('../../assets/models/puma/', import.meta.url);
+  const urdfResponse = await fetch(new URL('puma560_robot.urdf', modelRoot));
+  if (!urdfResponse.ok) throw new Error('Could not load the bundled PUMA URDF.');
+
+  const model = parseUrdf(await urdfResponse.text());
+  const linkMatrices = computeUrdfLinkMatrices(model);
+  const robotMeshes = new THREE.Group();
+  robotMeshes.name = 'puma-meshes';
+  robotWorld.add(robotMeshes);
+
+  for (const [linkName, link] of model.links) {
+    const linkMatrix = linkMatrices.get(linkName);
+    if (!linkMatrix) continue;
+    for (const visual of link.visuals) {
+      let geometry;
+      if (visual.geometry.type === 'mesh') {
+        const meshName = normalizeMeshPath(visual.geometry.filename).split('/').at(-1);
+        const meshResponse = await fetch(new URL(meshName, modelRoot));
+        if (!meshResponse.ok) throw new Error('Could not load bundled mesh ' + meshName + '.');
+        geometry = parseStlGeometry(await meshResponse.arrayBuffer());
+      } else {
+        geometry = createUrdfPrimitiveGeometry(visual.geometry);
+      }
+      if (!geometry) continue;
+
+      const visualGroup = new THREE.Group();
+      visualGroup.matrixAutoUpdate = false;
+      visualGroup.matrix.multiplyMatrices(linkMatrix, visual.origin);
+      const material = new THREE.MeshStandardMaterial({
+        color: visual.color,
+        roughness: 0.62,
+        metalness: 0.08,
+        transparent: true,
+        opacity: 0.82,
+        depthWrite: true
+      });
+      const mesh = new THREE.Mesh(geometry, material);
+      if (visual.geometry.scale) mesh.scale.fromArray(visual.geometry.scale);
+      visualGroup.add(mesh);
+      robotMeshes.add(visualGroup);
+    }
+  }
+
+  const revoluteJoints = model.joints.filter((joint) => (
+    joint.type === 'revolute' || joint.type === 'continuous'
+  )).slice(0, 6);
+  if (revoluteJoints.length !== 6) throw new Error('The bundled PUMA model does not contain six revolute joints.');
+
+  const frames = [{ id: 'world', label: 'world', matrix: new THREE.Matrix4() }];
+  revoluteJoints.forEach((joint, index) => {
+    frames.push({
+      id: 'F' + (index + 1),
+      label: 'F' + String.fromCharCode(0x2081 + index),
+      matrix: linkMatrices.get(joint.child).clone()
+    });
+  });
+
+  const labelOffsets = [
+    [-0.18, -0.18, 0.15],
+    [0.16, 0.14, 0.18],
+    [-0.17, 0.14, 0.23],
+    [0.16, -0.15, 0.18],
+    [-0.16, -0.16, 0.22],
+    [0.16, 0.14, 0.2],
+    [-0.17, 0.15, 0.14]
+  ];
+  frames.forEach((frame, index) => {
+    const visual = createFrameVisual(frame.label);
+    visual.label.position.fromArray(labelOffsets[index]);
+    visual.group.matrix.copy(frame.matrix);
+    visual.group.matrixWorldNeedsUpdate = true;
+    robotWorld.add(visual.group);
+    frame.visual = visual;
+  });
+
+  robotWorld.updateMatrixWorld(true);
+  const bounds = new THREE.Box3().setFromObject(robotMeshes);
+  if (!bounds.isEmpty()) {
+    const center = bounds.getCenter(new THREE.Vector3());
+    const size = Math.max(bounds.getSize(new THREE.Vector3()).length(), 1);
+    controls.target.copy(center);
+    camera.position.copy(center).add(new THREE.Vector3(1.15, 1.05, 0.82).normalize().multiplyScalar(size * 1.85));
+    camera.near = Math.max(size / 1000, 0.001);
+    camera.far = Math.max(size * 20, 100);
+    camera.updateProjectionMatrix();
+    controls.update();
+  }
+
+  const baseSelect = container.querySelector('[data-puma-base]');
+  const targetSelect = container.querySelector('[data-puma-target]');
+  const matrixBody = container.querySelector('[data-puma-transform-matrix]');
+  const transformName = container.querySelector('[data-puma-transform-name]');
+  const meshesToggle = container.querySelector('[data-puma-meshes]');
+  const markerSize = container.querySelector('[data-puma-marker-size]');
+  const markerSizeOutput = container.querySelector('[data-puma-marker-size-output]');
+  const opacity = container.querySelector('[data-puma-opacity]');
+  const opacityOutput = container.querySelector('[data-puma-opacity-output]');
+  const options = frames.map((frame) => `<option value="${frame.id}">${frame.label}</option>`).join('');
+  baseSelect.innerHTML = options;
+  targetSelect.innerHTML = options;
+  baseSelect.value = 'world';
+  targetSelect.value = 'F6';
+
+  function updateRelativeTransform() {
+    const base = frames.find((frame) => frame.id === baseSelect.value);
+    const target = frames.find((frame) => frame.id === targetSelect.value);
+    const baseInverse = base.matrix.clone().invert();
+    const relative = new THREE.Matrix4().multiplyMatrices(baseInverse, target.matrix);
+    matrixBody.innerHTML = matrixTableHtml(relative, 3);
+    transformName.textContent = base.label + ' ← ' + target.label;
+    frames.forEach((frame) => setFrameVisualSelected(frame.visual, frame === target));
+    applyMarkerSize();
+  }
+
+  function applyMarkerSize() {
+    const scale = Number(markerSize.value) / 100;
+    markerSizeOutput.textContent = markerSize.value + '%';
+    frames.forEach((frame) => {
+      frame.visual.group.matrix.copy(frame.matrix).scale(new THREE.Vector3(scale, scale, scale));
+      frame.visual.group.matrixWorldNeedsUpdate = true;
+    });
+  }
+
+  function applyRobotDisplay() {
+    robotMeshes.visible = meshesToggle.checked;
+    const alpha = Number(opacity.value) / 100;
+    opacityOutput.textContent = opacity.value + '%';
+    robotMeshes.traverse((object) => {
+      if (!object.isMesh) return;
+      const materials = Array.isArray(object.material) ? object.material : [object.material];
+      materials.forEach((material) => {
+        material.transparent = alpha < 1;
+        material.opacity = alpha;
+        material.depthWrite = alpha >= 0.95;
+        material.needsUpdate = true;
+      });
+    });
+  }
+
+  baseSelect.addEventListener('change', updateRelativeTransform);
+  targetSelect.addEventListener('change', updateRelativeTransform);
+  meshesToggle.addEventListener('change', applyRobotDisplay);
+  markerSize.addEventListener('input', applyMarkerSize);
+  opacity.addEventListener('input', applyRobotDisplay);
+  applyRobotDisplay();
+  updateRelativeTransform();
   typesetMath(container);
 }
 

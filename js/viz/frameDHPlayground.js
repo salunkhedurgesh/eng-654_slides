@@ -31,8 +31,8 @@ export function initFrameDHPlaygrounds() {
     }
   });
 
-  document.querySelectorAll('[data-puma-frame-demo]').forEach((container) => {
-    createPumaFrameDemo(container).catch((error) => fail(container, error));
+  document.querySelectorAll('[data-serial-frame-demo]').forEach((container) => {
+    createSerialFrameDemo(container).catch((error) => fail(container, error));
   });
 }
 
@@ -409,11 +409,11 @@ function createFramePoseDemo(container) {
   typesetMath(container);
 }
 
-async function createPumaFrameDemo(container) {
+async function createSerialFrameDemo(container) {
   container.classList.add('puma-frame-demo');
   container.innerHTML = `
     <div class="puma-frame-stage">
-      <p class="puma-frame-stage-note">PUMA · zero joint configuration · drag to orbit · scroll to zoom</p>
+      <p class="puma-frame-stage-note">custom_3R · zero joint configuration · drag to orbit · scroll to zoom</p>
     </div>
     <div class="puma-frame-panel">
       <div class="puma-frame-selectors">
@@ -425,12 +425,12 @@ async function createPumaFrameDemo(container) {
           <label for="puma-target-${uid(container)}">Target frame B</label>
           <select id="puma-target-${uid(container)}" data-puma-target></select>
         </div>
-        <p class="dh-help">\\({}^{A}T_B\\) maps coordinates expressed in B into coordinates expressed in A. Frames F₁–F₆ are the six URDF joint-child frames.</p>
+        <p class="dh-help">\\({}^{A}T_B\\) maps coordinates expressed in B into coordinates expressed in A. Frames F₁–F₃ are the three URDF joint-child frames.</p>
       </div>
       <div class="puma-transform-card" aria-live="polite">
         <div class="puma-transform-heading">
           <strong>Selected transform</strong>
-          <span data-puma-transform-name>world ← F₆</span>
+          <span data-puma-transform-name>world ← F₃</span>
         </div>
         <table class="pose-matrix" aria-label="Selected homogeneous transformation matrix">
           <tbody data-puma-transform-matrix></tbody>
@@ -470,14 +470,14 @@ async function createPumaFrameDemo(container) {
   const stage = container.querySelector('.puma-frame-stage');
   const sceneKit = createScene(stage, { camera: [2.6, 2.2, 2.0], worldFrame: false });
   const { robotWorld, camera, controls } = sceneKit;
-  const modelRoot = new URL('../../assets/models/puma/', import.meta.url);
-  const urdfResponse = await fetch(new URL('puma560_robot.urdf', modelRoot));
-  if (!urdfResponse.ok) throw new Error('Could not load the bundled PUMA URDF.');
+  const modelRoot = new URL('../../assets/models/custom_3R/', import.meta.url);
+  const urdfResponse = await fetch(new URL('custom_3R.urdf', modelRoot));
+  if (!urdfResponse.ok) throw new Error('Could not load the bundled custom_3R URDF.');
 
   const model = parseUrdf(await urdfResponse.text());
   const linkMatrices = computeUrdfLinkMatrices(model);
   const robotMeshes = new THREE.Group();
-  robotMeshes.name = 'puma-meshes';
+  robotMeshes.name = 'custom-3r-meshes';
   robotWorld.add(robotMeshes);
 
   for (const [linkName, link] of model.links) {
@@ -515,8 +515,8 @@ async function createPumaFrameDemo(container) {
 
   const revoluteJoints = model.joints.filter((joint) => (
     joint.type === 'revolute' || joint.type === 'continuous'
-  )).slice(0, 6);
-  if (revoluteJoints.length !== 6) throw new Error('The bundled PUMA model does not contain six revolute joints.');
+  ));
+  if (!revoluteJoints.length) throw new Error('The bundled custom_3R model contains no revolute joints.');
 
   const frames = [{ id: 'world', label: 'world', matrix: new THREE.Matrix4() }];
   revoluteJoints.forEach((joint, index) => {
@@ -551,7 +551,7 @@ async function createPumaFrameDemo(container) {
     const center = bounds.getCenter(new THREE.Vector3());
     const size = Math.max(bounds.getSize(new THREE.Vector3()).length(), 1);
     controls.target.copy(center);
-    camera.position.copy(center).add(new THREE.Vector3(1.15, 1.05, 0.82).normalize().multiplyScalar(size * 1.85));
+    camera.position.copy(center).add(new THREE.Vector3(1.15, 1.05, 0.82).normalize().multiplyScalar(size * 0.95));
     camera.near = Math.max(size / 1000, 0.001);
     camera.far = Math.max(size * 20, 100);
     camera.updateProjectionMatrix();
@@ -581,7 +581,7 @@ async function createPumaFrameDemo(container) {
     </label>
   `).join('');
   baseSelect.value = 'world';
-  targetSelect.value = 'F6';
+  targetSelect.value = frames.at(-1).id;
 
   function updateRelativeTransform() {
     const base = frames.find((frame) => frame.id === baseSelect.value);

@@ -421,6 +421,30 @@ function createDHPlayground(container) {
       </details>
 
       <details open>
+        <summary>Robot model</summary>
+        <div class="dh-section-body">
+          <label class="dh-file-picker">
+            <span>URDF + referenced STL files</span>
+            <input type="file" data-robot-files accept=".urdf,.stl" multiple>
+          </label>
+          <p class="dh-help">Choose one URDF and all of its STL files together. Files stay in this browser.</p>
+          <div class="dh-display-control">
+            <label class="dh-switch">
+              <input type="checkbox" data-toggle-robot-meshes checked>
+              <span class="dh-switch-track" aria-hidden="true"></span>
+              <span>Show robot meshes</span>
+            </label>
+          </div>
+          <label class="dh-opacity-control">
+            <span>Mesh opacity</span>
+            <input type="range" data-robot-opacity min="0" max="1" step="0.05" value="0.65">
+            <output data-robot-opacity-output>65%</output>
+          </label>
+          <p class="dh-live-note" data-robot-status aria-live="polite">Default: custom_3R robot with frames F0–F3.</p>
+        </div>
+      </details>
+
+      <details open>
         <summary>Add / edit with standard DH</summary>
         <div class="dh-section-body">
           <div class="dh-grid-2">
@@ -444,7 +468,7 @@ function createDHPlayground(container) {
             <button class="dh-button" type="button" data-apply-frame>Apply to selected</button>
             <button class="dh-button danger" type="button" data-remove-frame>Remove selected</button>
           </div>
-          <p class="dh-help">The new frame is created using \(R_z(\theta)T_z(d)T_x(a)R_x(\alpha)\) relative to its parent.</p>
+          <p class="dh-help">The new frame is created using \\(R_z(\\theta)T_z(d)T_x(a)R_x(\\alpha)\\) relative to its parent.</p>
           <p class="dh-live-note" data-live-note aria-live="polite"></p>
         </div>
       </details>
@@ -476,13 +500,17 @@ function createDHPlayground(container) {
 
   const stage = container.querySelector('.dh-stage');
   const sceneKit = createScene(stage, { camera: [5.8, 3.4, 5.4] });
-  const { robotWorld, renderer, camera } = sceneKit;
+  const { robotWorld, renderer, camera, controls } = sceneKit;
 
   const state = {
     frames: new Map(),
     selectedId: null,
     nextIndex: 1,
     connectionObjects: [],
+    robotRoot: new THREE.Group(),
+    robotMode: 'default',
+    robotMeshesVisible: true,
+    robotOpacity: 0.65,
     showLabels: true,
     showZAxes: true,
     showLinks: true
@@ -505,10 +533,222 @@ function createDHPlayground(container) {
     inferMatrix: container.querySelector('[data-infer-matrix]'),
     labels: container.querySelector('[data-toggle-labels]'),
     zaxes: container.querySelector('[data-toggle-zaxes]'),
-    links: container.querySelector('[data-toggle-links]')
+    links: container.querySelector('[data-toggle-links]'),
+    robotFiles: container.querySelector('[data-robot-files]'),
+    robotMeshes: container.querySelector('[data-toggle-robot-meshes]'),
+    robotOpacity: container.querySelector('[data-robot-opacity]'),
+    robotOpacityOutput: container.querySelector('[data-robot-opacity-output]'),
+    robotStatus: container.querySelector('[data-robot-status]')
   };
 
+  state.robotRoot.name = 'robot-visuals';
+  robotWorld.add(state.robotRoot);
+
   const paramInput = (key) => container.querySelector(`[data-dh-input="${key}"]`);
+
+  function clearRobotVisuals() {
+    [...state.robotRoot.children].forEach((object) => {
+      state.robotRoot.remove(object);
+      disposeObject(object);
+    });
+  }
+
+  function applyRobotDisplay() {
+    state.robotRoot.visible = state.robotMeshesVisible;
+    state.robotRoot.traverse((object) => {
+      if (!object.isMesh || !object.material) return;
+      const materials = Array.isArray(object.material) ? object.material : [object.material];
+      materials.forEach((material) => {
+        material.transparent = state.robotOpacity < 1;
+        material.opacity = state.robotOpacity;
+        material.depthWrite = state.robotOpacity >= 0.95;
+        material.needsUpdate = true;
+      });
+    });
+  }
+
+  function robotMaterial(color = 0x8c8c8c) {
+    return new THREE.MeshStandardMaterial({
+      color,
+      roughness: 0.62,
+      metalness: 0.08,
+      transparent: state.robotOpacity < 1,
+      opacity: state.robotOpacity
+    });
+  }
+
+  function addLinkMesh(start, end, radius, color) {
+    const direction = end.clone().sub(start);
+    const length = direction.length();
+    if (length < EPS) return;
+    const mesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(radius, radius, length, 24),
+      robotMaterial(color)
+    );
+    mesh.position.copy(start).add(end).multiplyScalar(0.5);
+    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
+    state.robotRoot.add(mesh);
+  }
+
+  function rebuildDefaultRobotVisuals() {
+    if (state.robotMode !== 'default') return;
+    clearRobotVisuals();
+
+    const origins = ['F0', 'F1', 'F2', 'F3']
+      .map((id) => state.frames.get(id))
+      .filter(Boolean)
+      .map((frame) => transformPoint(frame.robotMatrix, new THREE.Vector3()));
+    if (!origins.length) return;
+
+    addLinkMesh(new THREE.Vector3(), origins[0], 0.15, 0x555555);
+    for (let i = 1; i < origins.length; i += 1) {
+      const isToolLink = i === origins.length - 1;
+      addLinkMesh(origins[i - 1], origins[i], isToolLink ? 0.11 : 0.14, isToolLink ? 0xd9272e : 0x767676);
+    }
+    origins.forEach((origin, i) => {
+      const isTool = i === origins.length - 1;
+      const joint = new THREE.Mesh(
+        new THREE.SphereGeometry(isTool ? 0.14 : 0.19, 24, 18),
+        robotMaterial(isTool ? 0xd9272e : 0x303030)
+      );
+      joint.position.copy(origin);
+      state.robotRoot.add(joint);
+    });
+    applyRobotDisplay();
+  }
+
+  function fitCameraToRobot() {
+    state.robotRoot.updateMatrixWorld(true);
+    const bounds = new THREE.Box3().setFromObject(state.robotRoot);
+    if (bounds.isEmpty()) return;
+    const center = bounds.getCenter(new THREE.Vector3());
+    const size = Math.max(bounds.getSize(new THREE.Vector3()).length(), 1);
+    const viewDirection = camera.position.clone().sub(controls.target).normalize();
+    controls.target.copy(center);
+    camera.position.copy(center).addScaledVector(viewDirection, size * 1.25);
+    camera.near = Math.max(size / 1000, 0.001);
+    camera.far = Math.max(size * 20, 100);
+    camera.updateProjectionMatrix();
+    controls.update();
+  }
+
+  async function loadRobotFiles(fileList) {
+    const files = [...fileList];
+    const urdfFiles = files.filter((file) => file.name.toLowerCase().endsWith('.urdf'));
+    if (urdfFiles.length !== 1) {
+      throw new Error('Select exactly one .urdf file together with its referenced .stl files.');
+    }
+
+    const model = parseUrdf(await urdfFiles[0].text());
+    const meshFiles = new Map();
+    files.filter((file) => file.name.toLowerCase().endsWith('.stl')).forEach((file) => {
+      const relativeName = normalizeMeshPath(file.webkitRelativePath || file.name);
+      meshFiles.set(relativeName, file);
+      meshFiles.set(file.name.toLowerCase(), file);
+    });
+
+    state.robotMode = 'imported';
+    clearFrames();
+    clearRobotVisuals();
+
+    const jointsByParent = new Map();
+    model.joints.forEach((joint) => {
+      if (!jointsByParent.has(joint.parent)) jointsByParent.set(joint.parent, []);
+      jointsByParent.get(joint.parent).push(joint);
+    });
+
+    const addLinkTree = (linkName, parentId = 'W', localMatrix = new THREE.Matrix4()) => {
+      const id = 'urdf:' + linkName;
+      addFrame({ id, name: linkName, parentId, type: 'fixed', fixedMatrix: localMatrix });
+      (jointsByParent.get(linkName) || []).forEach((joint) => {
+        addLinkTree(joint.child, id, joint.origin);
+      });
+    };
+    model.roots.forEach((rootName) => addLinkTree(rootName));
+
+    state.selectedId = model.roots.length ? 'urdf:' + model.roots[0] : null;
+    state.nextIndex = state.frames.size + 1;
+    updateAll();
+
+    let loadedMeshes = 0;
+    let missingMeshes = 0;
+    for (const [linkName, link] of model.links) {
+      const frame = state.frames.get('urdf:' + linkName);
+      if (!frame) continue;
+      for (const visual of link.visuals) {
+        let geometry;
+        if (visual.geometry.type === 'mesh') {
+          const meshFile = findMeshFile(visual.geometry.filename, meshFiles);
+          if (!meshFile) {
+            missingMeshes += 1;
+            continue;
+          }
+          geometry = parseStlGeometry(await meshFile.arrayBuffer());
+        } else {
+          geometry = createUrdfPrimitiveGeometry(visual.geometry);
+        }
+        if (!geometry) continue;
+
+        const group = new THREE.Group();
+        group.matrixAutoUpdate = false;
+        group.matrix.multiplyMatrices(frame.robotMatrix, visual.origin);
+        const mesh = new THREE.Mesh(geometry, robotMaterial(visual.color));
+        if (visual.geometry.scale) mesh.scale.fromArray(visual.geometry.scale);
+        group.add(mesh);
+        state.robotRoot.add(group);
+        loadedMeshes += 1;
+      }
+    }
+
+    applyRobotDisplay();
+    fitCameraToRobot();
+    const missing = missingMeshes
+      ? ', ' + missingMeshes + ' missing STL file' + (missingMeshes === 1 ? '' : 's')
+      : '';
+    els.robotStatus.textContent = 'Loaded ' + model.name + ': ' + model.links.size + ' links, ' + loadedMeshes + ' visuals' + missing + '.';
+    note('Loaded URDF robot ' + model.name + ' at its zero joint configuration.');
+  }
+
+  async function loadBundledCustom3RVisuals() {
+    const modelRoot = new URL('../../assets/models/custom_3R/', import.meta.url);
+    const urdfUrl = new URL('custom_3R.urdf', modelRoot);
+    const response = await fetch(urdfUrl);
+    if (!response.ok) throw new Error('Could not load the bundled custom_3R URDF.');
+    const model = parseUrdf(await response.text());
+    const linkMatrices = computeUrdfLinkMatrices(model);
+
+    state.robotMode = 'bundled';
+    clearRobotVisuals();
+    let loadedMeshes = 0;
+    for (const [linkName, link] of model.links) {
+      const linkMatrix = linkMatrices.get(linkName);
+      if (!linkMatrix) continue;
+      for (const visual of link.visuals) {
+        let geometry;
+        if (visual.geometry.type === 'mesh') {
+          const meshName = normalizeMeshPath(visual.geometry.filename).split('/').at(-1);
+          const meshResponse = await fetch(new URL(meshName, modelRoot));
+          if (!meshResponse.ok) throw new Error('Could not load bundled mesh ' + meshName + '.');
+          geometry = parseStlGeometry(await meshResponse.arrayBuffer());
+        } else {
+          geometry = createUrdfPrimitiveGeometry(visual.geometry);
+        }
+        if (!geometry) continue;
+
+        const group = new THREE.Group();
+        group.matrixAutoUpdate = false;
+        group.matrix.multiplyMatrices(linkMatrix, visual.origin);
+        const mesh = new THREE.Mesh(geometry, robotMaterial(visual.color));
+        if (visual.geometry.scale) mesh.scale.fromArray(visual.geometry.scale);
+        group.add(mesh);
+        state.robotRoot.add(group);
+        loadedMeshes += 1;
+      }
+    }
+    applyRobotDisplay();
+    fitCameraToRobot();
+    els.robotStatus.textContent = 'Default: custom_3R URDF with ' + loadedMeshes + ' STL visuals and DH frames F0–F3.';
+  }
 
   function addFrame(spec) {
     if (state.frames.has(spec.id)) throw new Error(`Frame id ${spec.id} already exists.`);
@@ -565,7 +805,9 @@ function createDHPlayground(container) {
   }
 
   function loadCustom3R() {
+    state.robotMode = 'bundled-loading';
     clearFrames();
+    clearRobotVisuals();
     addFrame({
       id: 'F0',
       name: 'F0',
@@ -582,7 +824,14 @@ function createDHPlayground(container) {
     els.inferA.value = 'F0';
     els.inferB.value = 'F1';
     updateInference();
+    els.robotStatus.textContent = 'Loading bundled custom_3R URDF and STL visuals…';
     note('Loaded the custom_3R DH teaching model. F0 is offset from the URDF base by a fixed transform.');
+    loadBundledCustom3RVisuals().catch((error) => {
+      console.error('Bundled custom_3R load failed:', error);
+      state.robotMode = 'default';
+      rebuildDefaultRobotVisuals();
+      els.robotStatus.textContent = 'Bundled STL load failed; showing the geometric custom_3R fallback.';
+    });
   }
 
   function getLocalMatrix(frame) {
@@ -655,6 +904,7 @@ function createDHPlayground(container) {
       frame.visual.zAxis.visible = state.showZAxes;
     }
     rebuildConnections();
+    rebuildDefaultRobotVisuals();
   }
 
   function frameOptionsHtml() {
@@ -732,10 +982,11 @@ function createDHPlayground(container) {
     const inferred = inferStandardDH(relative);
     els.inferResults.innerHTML = [
       ['a', `${formatNumber(inferred.a, 4)} m`],
-      ['α', formatDeg(inferred.alpha, 2)],
+      ['\\alpha', formatDeg(inferred.alpha, 2)],
       ['d', `${formatNumber(inferred.d, 4)} m`],
-      ['θ', formatDeg(inferred.theta, 2)]
-    ].map(([symbol, value]) => `<div class="dh-result"><span class="symbol">${symbol}</span><span class="value">${value}</span></div>`).join('');
+      ['\\theta', formatDeg(inferred.theta, 2)]
+    ].map(([symbol, value]) => `<div class="dh-result"><span class="symbol">\\(${symbol}\\)</span><span class="value">${value}</span></div>`).join('');
+    typesetMath(els.inferResults);
 
     els.inferMatrix.innerHTML = matrixTableHtml(relative, 3);
     els.inferStatus.classList.toggle('is-warning', !inferred.compatible);
@@ -799,7 +1050,9 @@ function createDHPlayground(container) {
 
   els.reset.addEventListener('click', loadCustom3R);
   els.clear.addEventListener('click', () => {
+    state.robotMode = 'none';
     clearFrames();
+    clearRobotVisuals();
     state.nextIndex = 1;
     updateAll();
     els.parentSelect.value = 'W';
@@ -807,6 +1060,31 @@ function createDHPlayground(container) {
     els.inferB.value = 'W';
     els.frameName.value = 'F1';
     note('Cleared all user frames. World W remains fixed.');
+  });
+
+  els.robotFiles.addEventListener('change', async () => {
+    if (!els.robotFiles.files.length) return;
+    els.robotFiles.disabled = true;
+    els.robotStatus.textContent = 'Loading URDF and meshes…';
+    try {
+      await loadRobotFiles(els.robotFiles.files);
+    } catch (error) {
+      console.error('URDF/STL import failed:', error);
+      els.robotStatus.textContent = 'Import failed: ' + error.message;
+      note('Robot import failed. Reset custom_3R to restore the default model.');
+    } finally {
+      els.robotFiles.disabled = false;
+      els.robotFiles.value = '';
+    }
+  });
+  els.robotMeshes.addEventListener('change', () => {
+    state.robotMeshesVisible = els.robotMeshes.checked;
+    applyRobotDisplay();
+  });
+  els.robotOpacity.addEventListener('input', () => {
+    state.robotOpacity = Number(els.robotOpacity.value);
+    els.robotOpacityOutput.textContent = Math.round(state.robotOpacity * 100) + '%';
+    applyRobotDisplay();
   });
 
   els.inferA.addEventListener('change', updateInference);
@@ -821,6 +1099,211 @@ function createDHPlayground(container) {
 
   loadCustom3R();
   typesetMath(container);
+}
+
+function directChild(element, tagName) {
+  return [...(element?.children || [])].find((child) => child.tagName.toLowerCase() === tagName) || null;
+}
+
+function numberList(value, fallback) {
+  if (!value) return [...fallback];
+  const values = value.trim().split(/\s+/).map(Number);
+  return values.length === fallback.length && values.every(Number.isFinite) ? values : [...fallback];
+}
+
+function urdfOrigin(element) {
+  const origin = directChild(element, 'origin');
+  const [x, y, z] = numberList(origin?.getAttribute('xyz'), [0, 0, 0]);
+  const [roll, pitch, yaw] = numberList(origin?.getAttribute('rpy'), [0, 0, 0]);
+  return makeRPYMatrix(x, y, z, roll, pitch, yaw);
+}
+
+function urdfColor(materialElement, namedMaterials) {
+  const inlineColor = directChild(materialElement, 'color')?.getAttribute('rgba');
+  const namedColor = namedMaterials.get(materialElement?.getAttribute('name')) || null;
+  const rgba = numberList(inlineColor || namedColor, [0.55, 0.55, 0.55, 1]);
+  return new THREE.Color(rgba[0], rgba[1], rgba[2]).getHex();
+}
+
+function parseUrdfGeometry(geometryElement) {
+  const mesh = directChild(geometryElement, 'mesh');
+  if (mesh) {
+    return {
+      type: 'mesh',
+      filename: mesh.getAttribute('filename') || '',
+      scale: numberList(mesh.getAttribute('scale'), [1, 1, 1])
+    };
+  }
+  const box = directChild(geometryElement, 'box');
+  if (box) return { type: 'box', size: numberList(box.getAttribute('size'), [1, 1, 1]) };
+  const cylinder = directChild(geometryElement, 'cylinder');
+  if (cylinder) {
+    return {
+      type: 'cylinder',
+      radius: finiteNumber(cylinder.getAttribute('radius'), 0.5),
+      length: finiteNumber(cylinder.getAttribute('length'), 1)
+    };
+  }
+  const sphere = directChild(geometryElement, 'sphere');
+  if (sphere) return { type: 'sphere', radius: finiteNumber(sphere.getAttribute('radius'), 0.5) };
+  return null;
+}
+
+function parseUrdf(xmlText) {
+  const documentNode = new DOMParser().parseFromString(xmlText, 'application/xml');
+  const parseError = documentNode.querySelector('parsererror');
+  if (parseError) throw new Error('The URDF is not valid XML.');
+  const robot = documentNode.documentElement;
+  if (robot.tagName.toLowerCase() !== 'robot') throw new Error('The selected XML file has no <robot> root.');
+
+  const namedMaterials = new Map();
+  [...robot.children].filter((element) => element.tagName.toLowerCase() === 'material').forEach((material) => {
+    const rgba = directChild(material, 'color')?.getAttribute('rgba');
+    if (material.getAttribute('name') && rgba) namedMaterials.set(material.getAttribute('name'), rgba);
+  });
+
+  const links = new Map();
+  [...robot.children].filter((element) => element.tagName.toLowerCase() === 'link').forEach((linkElement) => {
+    const name = linkElement.getAttribute('name');
+    if (!name) return;
+    const visuals = [...linkElement.children]
+      .filter((element) => element.tagName.toLowerCase() === 'visual')
+      .map((visualElement) => {
+        const geometry = parseUrdfGeometry(directChild(visualElement, 'geometry'));
+        if (!geometry) return null;
+        return {
+          origin: urdfOrigin(visualElement),
+          geometry,
+          color: urdfColor(directChild(visualElement, 'material'), namedMaterials)
+        };
+      })
+      .filter(Boolean);
+    links.set(name, { name, visuals });
+  });
+
+  const joints = [...robot.children]
+    .filter((element) => element.tagName.toLowerCase() === 'joint')
+    .map((jointElement) => ({
+      name: jointElement.getAttribute('name') || 'joint',
+      type: jointElement.getAttribute('type') || 'fixed',
+      parent: directChild(jointElement, 'parent')?.getAttribute('link') || '',
+      child: directChild(jointElement, 'child')?.getAttribute('link') || '',
+      origin: urdfOrigin(jointElement)
+    }))
+    .filter((joint) => links.has(joint.parent) && links.has(joint.child));
+
+  const childLinks = new Set(joints.map((joint) => joint.child));
+  const roots = [...links.keys()].filter((name) => !childLinks.has(name));
+  if (!links.size || !roots.length) throw new Error('The URDF contains no valid rooted link tree.');
+
+  return {
+    name: robot.getAttribute('name') || 'URDF robot',
+    links,
+    joints,
+    roots
+  };
+}
+
+function computeUrdfLinkMatrices(model) {
+  const matrices = new Map();
+  const jointsByParent = new Map();
+  model.joints.forEach((joint) => {
+    if (!jointsByParent.has(joint.parent)) jointsByParent.set(joint.parent, []);
+    jointsByParent.get(joint.parent).push(joint);
+  });
+  const visit = (linkName, worldMatrix) => {
+    matrices.set(linkName, worldMatrix);
+    (jointsByParent.get(linkName) || []).forEach((joint) => {
+      visit(joint.child, new THREE.Matrix4().multiplyMatrices(worldMatrix, joint.origin));
+    });
+  };
+  model.roots.forEach((rootName) => visit(rootName, new THREE.Matrix4()));
+  return matrices;
+}
+
+function normalizeMeshPath(filename) {
+  let path = String(filename || '').replaceAll('\\', '/').toLowerCase();
+  path = path.replace(/^package:\/\/[^/]+\//, '').replace(/^file:\/\//, '');
+  try {
+    path = decodeURIComponent(path);
+  } catch {
+    // Keep the literal path when it contains malformed URL escapes.
+  }
+  return path.replace(/^\.?\//, '');
+}
+
+function findMeshFile(filename, meshFiles) {
+  const normalized = normalizeMeshPath(filename);
+  const basename = normalized.split('/').at(-1);
+  if (meshFiles.has(normalized)) return meshFiles.get(normalized);
+  if (meshFiles.has(basename)) return meshFiles.get(basename);
+  for (const [path, file] of meshFiles) {
+    if (path.endsWith('/' + normalized) || path.endsWith('/' + basename)) return file;
+  }
+  return null;
+}
+
+function createUrdfPrimitiveGeometry(spec) {
+  if (spec.type === 'box') return new THREE.BoxGeometry(...spec.size);
+  if (spec.type === 'sphere') return new THREE.SphereGeometry(spec.radius, 28, 20);
+  if (spec.type === 'cylinder') {
+    const geometry = new THREE.CylinderGeometry(spec.radius, spec.radius, spec.length, 28);
+    geometry.rotateX(Math.PI / 2);
+    return geometry;
+  }
+  return null;
+}
+
+function parseStlGeometry(arrayBuffer) {
+  const view = new DataView(arrayBuffer);
+  const triangleCount = arrayBuffer.byteLength >= 84 ? view.getUint32(80, true) : 0;
+  const expectedBinarySize = 84 + triangleCount * 50;
+  const isBinary = triangleCount > 0 && expectedBinarySize === arrayBuffer.byteLength;
+  const positions = [];
+  const normals = [];
+
+  if (isBinary) {
+    let offset = 84;
+    for (let triangle = 0; triangle < triangleCount; triangle += 1) {
+      const normal = [
+        view.getFloat32(offset, true),
+        view.getFloat32(offset + 4, true),
+        view.getFloat32(offset + 8, true)
+      ];
+      offset += 12;
+      for (let vertex = 0; vertex < 3; vertex += 1) {
+        positions.push(
+          view.getFloat32(offset, true),
+          view.getFloat32(offset + 4, true),
+          view.getFloat32(offset + 8, true)
+        );
+        normals.push(...normal);
+        offset += 12;
+      }
+      offset += 2;
+    }
+  } else {
+    const text = new TextDecoder().decode(arrayBuffer);
+    const number = '([-+]?(?:\\d*\\.)?\\d+(?:[eE][-+]?\\d+)?)';
+    const vertexPattern = new RegExp('vertex\\s+' + number + '\\s+' + number + '\\s+' + number, 'gi');
+    for (const match of text.matchAll(vertexPattern)) {
+      positions.push(Number(match[1]), Number(match[2]), Number(match[3]));
+    }
+  }
+
+  if (positions.length < 9 || positions.length % 9 !== 0) {
+    throw new Error('An STL file contains no valid triangle geometry.');
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  if (normals.length === positions.length) {
+    geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+  } else {
+    geometry.computeVertexNormals();
+  }
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
+  return geometry;
 }
 
 function readDHInputs(getInput) {
@@ -915,10 +1398,10 @@ function createCustom3RDHDemo(container) {
             <tr data-row="3"><td>3</td><td>1.50</td><td>0°</td><td>0.25</td><td>q₃</td></tr>
           </tbody>
         </table>
-        <p class="dh-help">Fixed base transform: \(^W T_0=T_z(1.0\,\mathrm m)\). The DH frame origin may lie anywhere on the same revolute axis; it need not coincide with the URDF joint-origin point.</p>
+        <p class="dh-help">Fixed base transform: \\({}^{W}T_{0}=T_z(1.0\\,\\mathrm{m})\\). The DH frame origin may lie anywhere on the same revolute axis; it need not coincide with the URDF joint-origin point.</p>
       </div>
       <div class="custom3r-card">
-        <strong>Tool pose \(^W T_3\)</strong>
+        <strong>Tool pose \\({}^{W}T_{3}\\)</strong>
         <table class="dh-matrix"><tbody data-tool-matrix></tbody></table>
       </div>
     </div>

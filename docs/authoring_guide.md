@@ -60,6 +60,13 @@ In deck mode, arrow/space reveals each child before advancing the slide.
 ```
 
 The 2D math convention is y-up. Internally, the visualizer flips y only at drawing time.
+The default `data-trace-mode="fading"` keeps the latest 250 path points. Use
+`data-trace-mode="persistent"` to retain the complete end-effector path, for example
+when tracing a workspace boundary. The on-screen path button can switch modes live.
+Set `data-fading-path-length` to customize the fading trail length.
+Slider motion uses critically damped interpolation so abrupt input still produces a smooth
+end-effector path. Set `data-smooth-time` in seconds to adjust its responsiveness (default `0.12`).
+Each joint can be configured with either its slider or the synchronized numeric degree input.
 
 ## 3D revolute joint demo
 

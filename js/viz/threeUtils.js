@@ -15,7 +15,7 @@ export function createBoldAxes(length = 1.4) {
   const shaftRadius = length * 0.025;
   const headRadius = length * 0.065;
 
-  const addAxis = (color, rotation, position) => {
+  const addAxis = (color, rotation) => {
     const material = new THREE.MeshStandardMaterial({ color });
     const axis = new THREE.Group();
 
@@ -33,15 +33,14 @@ export function createBoldAxes(length = 1.4) {
     arrowhead.position.y = shaftLength + headLength / 2;
     axis.add(arrowhead);
 
+    // Three.js cylinders and cones point along +y by default.
     axis.rotation.set(...rotation);
-    axis.position.set(...position);
     axes.add(axis);
   };
 
-  // Three.js cylinders and cones point along +y by default.
-  addAxis(0xff3030, [0, 0, -Math.PI / 2], [0, 0, 0]); // +x
-  addAxis(0x35b85a, [0, 0, 0], [0, 0, 0]);             // +y
-  addAxis(0x2775ff, [Math.PI / 2, 0, 0], [0, 0, 0]);   // +z
+  addAxis(0xff3030, [0, 0, -Math.PI / 2]); // +x
+  addAxis(0x35b85a, [0, 0, 0]);             // +y
+  addAxis(0x2775ff, [Math.PI / 2, 0, 0]);   // +z
 
   return axes;
 }

@@ -301,6 +301,20 @@
 .poe-factor-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.25rem; margin-top: 0.4rem; }
 .poe-factor { padding: 0.32rem; border-top: 2px solid var(--black); background: #fafafa; text-align: center; }
 .poe-factor.is-active { border-top-color: var(--epfl-red); }
+.poe-ghost-control {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.4rem;
+  align-items: center;
+  margin-top: 0.5rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--line);
+  cursor: pointer;
+  font-weight: 700;
+}
+.poe-ghost-control input { accent-color: var(--epfl-red); }
+.poe-ghost-control output { color: var(--muted); font-variant-numeric: tabular-nums; }
+.poe-model-status { margin: 0.3rem 0 0; color: var(--muted); font-size: 0.82em; }
 
 .urdf-editor-demo { grid-template-columns: minmax(24rem, 1fr) minmax(0, 1fr); }
 .urdf-editor-pane { min-width: 0; min-height: 0; display: grid; grid-template-rows: auto 1fr auto; gap: 0.35rem; }

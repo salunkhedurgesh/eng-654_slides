@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { createBoldAxes, createZUpWorld, resizeRendererToContainer } from './threeUtils.js';
+import { parseStlGeometry } from './frameDHPlayground.js';
 
 const DEG = Math.PI / 180;
 const EPS = 1e-8;
@@ -15,12 +16,19 @@ export function initPoeUrdfPlaygrounds() {
 
 function initAll(selector, factory) {
   document.querySelectorAll(selector).forEach((container) => {
-    try { factory(container); }
+    try {
+      const result = factory(container);
+      if (result?.catch) result.catch((error) => failDemo(container, error));
+    }
     catch (error) {
-      container.innerHTML = `<div class="warning">Interactive demo could not start: ${escapeHtml(error.message)}</div>`;
-      console.error('ENG-654 PoE/URDF demo failed:', error);
+      failDemo(container, error);
     }
   });
+}
+
+function failDemo(container, error) {
+  container.innerHTML = `<div class="warning">Interactive demo could not start: ${escapeHtml(error.message)}</div>`;
+  console.error('ENG-654 PoE/URDF demo failed:', error);
 }
 
 function sceneKit(stage, cameraPosition = [4.5, 3.2, 4.2]) {
@@ -75,14 +83,6 @@ function frame(name, scale = 0.65, accent = false) {
 
 function line(points, color = 0xff0000, opacity = 0.85) {
   return new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), new THREE.LineBasicMaterial({ color, transparent: true, opacity }));
-}
-
-function cylinderBetween(a, b, radius = 0.08, color = 0x777777, opacity = 1) {
-  const direction = b.clone().sub(a), length = direction.length();
-  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, Math.max(length, EPS), 24), new THREE.MeshStandardMaterial({ color, roughness: 0.65, transparent: opacity < 1, opacity }));
-  mesh.position.copy(a).add(b).multiplyScalar(0.5);
-  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
-  return mesh;
 }
 
 function matrixRows(matrix) {
@@ -254,13 +254,15 @@ function createScrewFrameDemo(container) {
   Object.values(inputs).forEach((input) => input.addEventListener('input', update)); update(); typeset(container);
 }
 
-function createCustom3RPoeDemo(container) {
+async function createCustom3RPoeDemo(container) {
   container.className = 'l2-demo custom3r-poe-demo';
   container.innerHTML = `
-    <div class="l2-stage"><p class="l2-stage-note">space PoE · black curve: end-effector trace</p></div>
+    <div class="l2-stage"><p class="l2-stage-note">custom_3R URDF/STL · space PoE · black curve: end-effector trace</p></div>
     <div class="l2-panel">
       <div class="l2-card"><strong>Joint coordinates</strong>
-        ${[1,2,3].map((i) => `<div class="l2-control"><label>q${i}</label><input data-q="${i-1}" type="range" min="-170" max="170" value="0"><output data-q-out="${i-1}">0°</output></div>`).join('')}
+        ${[1,2,3].map((i) => `<div class="l2-control"><label>q${i}</label><input data-q="${i-1}" type="range" min="-170" max="170" step="0.1" value="0"><output data-q-out="${i-1}">0.0°</output></div>`).join('')}
+        <label class="poe-ghost-control"><input data-home-ghost type="checkbox" checked><span>Keep home configuration as ghost</span><output>50%</output></label>
+        <p class="poe-model-status" data-model-status>Loading custom_3R meshes…</p>
       </div>
       <div class="l2-card"><strong>Ordered factors</strong><div class="poe-factor-strip"><div class="poe-factor">\\(e^{\\hat\\xi_1q_1}\\)</div><div class="poe-factor">\\(e^{\\hat\\xi_2q_2}\\)</div><div class="poe-factor">\\(e^{\\hat\\xi_3q_3}\\)</div><div class="poe-factor">\\(M\\)</div></div></div>
       <div class="l2-card"><strong>Tool pose \\(T(q)\\)</strong><table class="l2-matrix"><tbody data-tool-matrix></tbody></table></div>
@@ -270,44 +272,119 @@ function createCustom3RPoeDemo(container) {
   kit.controls.target.set(2.1, .6, .9);
   const omega = [new THREE.Vector3(0,0,1), new THREE.Vector3(0,1,0), new THREE.Vector3(0,0,1)];
   const points = [new THREE.Vector3(0,0,.5), new THREE.Vector3(1,0,1), new THREE.Vector3(3,1.25,1)];
-  const homeTool = new THREE.Vector3(4.5,1.25,1.25), q = [0,0,0];
+  const homeTool = new THREE.Vector3(4.5,1.25,1.25);
+  const q = [0,0,0], targetQ = [0,0,0];
   const frameVisuals = ['F₁','F₂','F₃','F₄'].map((name, index) => {
     const visual = frame(name, index === 3 ? .62 : .52, index === 3);
     kit.world.add(visual.group); return visual;
   });
-  let links = [], tracePoints = [], trace = line([], 0x111111, .65); kit.world.add(trace);
+  const robot = new THREE.Group(), homeGhost = new THREE.Group();
+  robot.name = 'custom_3R-current';
+  homeGhost.name = 'custom_3R-home-ghost';
+  kit.world.add(homeGhost, robot);
+  let robotVisuals = [], tracePoints = [], trace = line([], 0x111111, .65);
+  kit.world.add(trace);
   function prefixMatrix(count) {
     const matrix = new THREE.Matrix4();
     for (let i = 0; i < count; i += 1) matrix.multiply(expRevolute(omega[i], points[i], q[i]));
     return matrix;
   }
   function applyPrefix(source, count) { return source.clone().applyMatrix4(prefixMatrix(count)); }
-  function update(active = -1) {
+  function update(active = -1, recordPath = true) {
     const positions = [points[0].clone(), applyPrefix(points[1],1), applyPrefix(points[2],2), applyPrefix(homeTool,3)];
-    links.forEach((object) => { kit.world.remove(object); object.geometry.dispose(); object.material.dispose(); });
-    links = [
-      cylinderBetween(new THREE.Vector3(0,0,0), positions[0], .13, 0x333333),
-      cylinderBetween(positions[0], positions[1], .13, 0x058080, .9),
-      cylinderBetween(positions[1], positions[2], .13, 0xbdbdbd, .95),
-      cylinderBetween(positions[2], positions[3], .13, 0x058080, .9)
-    ];
-    links.forEach((object) => kit.world.add(object));
+    robotVisuals.forEach((visual) => {
+      visual.group.matrix.multiplyMatrices(prefixMatrix(visual.prefixCount), visual.homeMatrix);
+      visual.group.matrixWorldNeedsUpdate = true;
+    });
     frameVisuals.forEach((visual, i) => {
       const matrix = prefixMatrix(Math.min(i,3)); matrix.setPosition(positions[i]);
       visual.group.matrix.copy(matrix); visual.group.matrixWorldNeedsUpdate = true;
     });
     const toolMatrix = prefixMatrix(3); toolMatrix.setPosition(positions[3]);
     container.querySelector('[data-tool-matrix]').innerHTML = matrixHtml(toolMatrix);
-    tracePoints.push(positions[3].clone()); if (tracePoints.length > 700) tracePoints.shift();
-    kit.world.remove(trace); trace.geometry.dispose(); trace.material.dispose(); trace = line(tracePoints, 0x111111, .7); kit.world.add(trace);
+    if (recordPath) {
+      tracePoints.push(positions[3].clone()); if (tracePoints.length > 900) tracePoints.shift();
+      kit.world.remove(trace); trace.geometry.dispose(); trace.material.dispose(); trace = line(tracePoints, 0x111111, .7); kit.world.add(trace);
+    }
     container.querySelectorAll('.poe-factor').forEach((el,i) => el.classList.toggle('is-active', i === active));
   }
   container.querySelectorAll('[data-q]').forEach((input) => input.addEventListener('input', () => {
-    const i = Number(input.dataset.q); q[i] = Number(input.value) * DEG;
-    container.querySelector(`[data-q-out="${i}"]`).textContent = input.value + '°'; update(i);
+    const i = Number(input.dataset.q);
+    targetQ[i] = Number(input.value) * DEG;
+    container.querySelector(`[data-q-out="${i}"]`).textContent = Number(input.value).toFixed(1) + '°';
+    container.querySelectorAll('.poe-factor').forEach((el,index) => el.classList.toggle('is-active', index === i));
   }));
-  container.querySelector('[data-clear-path]').addEventListener('click', () => { tracePoints = []; update(); });
-  update(); typeset(container);
+  container.querySelector('[data-home-ghost]').addEventListener('change', (event) => { homeGhost.visible = event.target.checked; });
+  container.querySelector('[data-clear-path]').addEventListener('click', () => {
+    tracePoints = [];
+    kit.world.remove(trace); trace.geometry.dispose(); trace.material.dispose();
+    trace = line([], 0x111111, .7); kit.world.add(trace);
+  });
+
+  let previousTime = performance.now();
+  function smoothMotion(time) {
+    const dt = Math.min((time - previousTime) / 1000, .05);
+    previousTime = time;
+    const blend = 1 - Math.exp(-12 * dt);
+    let moving = false, active = -1, largestError = 0;
+    q.forEach((value, i) => {
+      const error = targetQ[i] - value;
+      if (Math.abs(error) > 1e-5) {
+        q[i] += error * blend;
+        if (Math.abs(targetQ[i] - q[i]) < 1e-5) q[i] = targetQ[i];
+        moving = true;
+      }
+      if (Math.abs(error) > largestError) { largestError = Math.abs(error); active = i; }
+    });
+    if (moving) update(active);
+    requestAnimationFrame(smoothMotion);
+  }
+
+  const modelRoot = new URL('../../assets/models/custom_3R/', import.meta.url);
+  const homeLinks = [
+    new THREE.Matrix4(),
+    new THREE.Matrix4().makeTranslation(0,0,.5),
+    new THREE.Matrix4().makeTranslation(1,0,1),
+    new THREE.Matrix4().makeTranslation(3,1.25,1)
+  ];
+  const visualOrigins = [
+    new THREE.Matrix4(),
+    new THREE.Matrix4(),
+    rpyMatrix(0,.25,0,0,0,-1.5707),
+    new THREE.Matrix4().makeTranslation(0,0,.25)
+  ];
+  const meshSpecs = [
+    { file: 'base_link.stl', prefixCount: 0, color: 0x333638 },
+    { file: 'link_1.stl', prefixCount: 1, color: 0x0d7d80 },
+    { file: 'link_2.stl', prefixCount: 2, color: 0xb8b8b8 },
+    { file: 'link_3.stl', prefixCount: 3, color: 0x0d7d80 }
+  ];
+  const loaded = await Promise.all(meshSpecs.map(async (spec, index) => {
+    const response = await fetch(new URL(spec.file, modelRoot));
+    if (!response.ok) throw new Error('Could not load custom_3R mesh ' + spec.file + '.');
+    return { spec, index, geometry: parseStlGeometry(await response.arrayBuffer()) };
+  }));
+  loaded.forEach(({ spec, index, geometry }) => {
+    const homeMatrix = homeLinks[index].clone().multiply(visualOrigins[index]);
+    const currentGroup = new THREE.Group();
+    currentGroup.matrixAutoUpdate = false;
+    currentGroup.add(new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: spec.color, roughness: .62, metalness: .06 })));
+    robot.add(currentGroup);
+    robotVisuals.push({ group: currentGroup, prefixCount: spec.prefixCount, homeMatrix });
+    if (index > 0) {
+      const ghostGroup = new THREE.Group();
+      ghostGroup.matrixAutoUpdate = false;
+      ghostGroup.matrix.copy(homeMatrix);
+      ghostGroup.add(new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
+        color: spec.color, roughness: .7, transparent: true, opacity: .5, depthWrite: false
+      })));
+      homeGhost.add(ghostGroup);
+    }
+  });
+  container.querySelector('[data-model-status]').textContent = 'Loaded custom_3R · 4 STL visuals';
+  update(-1, false);
+  typeset(container);
+  requestAnimationFrame(smoothMotion);
 }
 
 const DEFAULT_URDF = `<robot name="two_frame_lab">

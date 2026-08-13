@@ -1583,7 +1583,7 @@ function createUrdfPrimitiveGeometry(spec) {
   return null;
 }
 
-function parseStlGeometry(arrayBuffer) {
+export function parseStlGeometry(arrayBuffer) {
   const view = new DataView(arrayBuffer);
   const triangleCount = arrayBuffer.byteLength >= 84 ? view.getUint32(80, true) : 0;
   const expectedBinarySize = 84 + triangleCount * 50;

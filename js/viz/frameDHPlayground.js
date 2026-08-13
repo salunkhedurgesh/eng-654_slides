@@ -453,6 +453,17 @@ async function createPumaFrameDemo(container) {
           <output data-puma-opacity-output>55%</output>
         </label>
       </div>
+      <div class="puma-frame-visibility" role="group" aria-label="Frame visibility controls">
+        <div class="puma-frame-visibility-heading">
+          <strong>Visible frames</strong>
+          <div class="puma-frame-sequence-actions">
+            <button class="dh-button" data-puma-hide-frames type="button">Hide all</button>
+            <button class="dh-button primary" data-puma-reveal-next type="button">Reveal next</button>
+            <button class="dh-button" data-puma-show-frames type="button">Show all</button>
+          </div>
+        </div>
+        <div class="puma-frame-checks" data-puma-frame-checks></div>
+      </div>
     </div>
   `;
 
@@ -556,9 +567,19 @@ async function createPumaFrameDemo(container) {
   const markerSizeOutput = container.querySelector('[data-puma-marker-size-output]');
   const opacity = container.querySelector('[data-puma-opacity]');
   const opacityOutput = container.querySelector('[data-puma-opacity-output]');
+  const frameChecks = container.querySelector('[data-puma-frame-checks]');
+  const hideFramesButton = container.querySelector('[data-puma-hide-frames]');
+  const revealNextButton = container.querySelector('[data-puma-reveal-next]');
+  const showFramesButton = container.querySelector('[data-puma-show-frames]');
   const options = frames.map((frame) => `<option value="${frame.id}">${frame.label}</option>`).join('');
   baseSelect.innerHTML = options;
   targetSelect.innerHTML = options;
+  frameChecks.innerHTML = frames.map((frame) => `
+    <label class="puma-frame-check">
+      <input data-puma-frame-id="${frame.id}" type="checkbox" checked>
+      <span>${frame.label}</span>
+    </label>
+  `).join('');
   baseSelect.value = 'world';
   targetSelect.value = 'F6';
 
@@ -598,12 +619,40 @@ async function createPumaFrameDemo(container) {
     });
   }
 
+  function applyFrameVisibility() {
+    const checks = [...frameChecks.querySelectorAll('[data-puma-frame-id]')];
+    checks.forEach((checkbox) => {
+      const frame = frames.find((candidate) => candidate.id === checkbox.dataset.pumaFrameId);
+      if (frame) frame.visual.group.visible = checkbox.checked;
+    });
+    revealNextButton.disabled = checks.every((checkbox) => checkbox.checked);
+  }
+
+  function setAllFramesVisible(visible) {
+    frameChecks.querySelectorAll('[data-puma-frame-id]').forEach((checkbox) => {
+      checkbox.checked = visible;
+    });
+    applyFrameVisibility();
+  }
+
+  function revealNextFrame() {
+    const next = [...frameChecks.querySelectorAll('[data-puma-frame-id]')]
+      .find((checkbox) => !checkbox.checked);
+    if (next) next.checked = true;
+    applyFrameVisibility();
+  }
+
   baseSelect.addEventListener('change', updateRelativeTransform);
   targetSelect.addEventListener('change', updateRelativeTransform);
   meshesToggle.addEventListener('change', applyRobotDisplay);
   markerSize.addEventListener('input', applyMarkerSize);
   opacity.addEventListener('input', applyRobotDisplay);
+  frameChecks.addEventListener('change', applyFrameVisibility);
+  hideFramesButton.addEventListener('click', () => setAllFramesVisible(false));
+  revealNextButton.addEventListener('click', revealNextFrame);
+  showFramesButton.addEventListener('click', () => setAllFramesVisible(true));
   applyRobotDisplay();
+  applyFrameVisibility();
   updateRelativeTransform();
   typesetMath(container);
 }

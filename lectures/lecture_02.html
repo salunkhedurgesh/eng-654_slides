@@ -129,23 +129,152 @@
     </section>
 
     <section class="slide">
-      <p class="slide-kicker">Act II · Exponential to transformation</p>
-      <h2 class="slide-title">Rodrigues’ formula appears inside the rigid transform</h2>
-      <p class="slide-subtitle">For \(\|\boldsymbol\omega\|=1\), exponentiating the twist produces rotation and its induced translation together.</p>
+      <p class="slide-kicker">Act II · Rodrigues derivation 1/3</p>
+      <h2 class="slide-title">The skew generator has only three independent powers</h2>
+      <p class="slide-subtitle">Let \(K=[\boldsymbol\omega]_\times\), where \(\|\boldsymbol\omega\|=1\). We first simplify powers of \(K\) before expanding the exponential.</p>
       <div class="layout-two-column divided">
-        <div><div class="equation">\[R(\theta)=e^{[\boldsymbol\omega]_\times\theta}=I+\sin\theta[\boldsymbol\omega]_\times+(1-\cos\theta)[\boldsymbol\omega]_\times^2\]</div></div>
-        <div><div class="equation">\[e^{\widehat{\boldsymbol\xi}\theta}=\begin{bmatrix}R(\theta)&(I-R)(\boldsymbol\omega\times\mathbf v)+\boldsymbol\omega\boldsymbol\omega^T\mathbf v\,\theta\\\mathbf0^T&1\end{bmatrix}\]</div></div>
+        <div>
+          <p class="lead">Apply \(K^2\) to any vector \(\mathbf p\).</p>
+          <div class="equation">
+            \[
+            K^2\mathbf p
+            =\boldsymbol\omega\times(\boldsymbol\omega\times\mathbf p)
+            =\boldsymbol\omega(\boldsymbol\omega^T\mathbf p)-\mathbf p
+            \]
+          </div>
+          <p>The vector triple-product identity gives</p>
+          <div class="equation">\[K^2=\boldsymbol\omega\boldsymbol\omega^T-I.\]</div>
+        </div>
+        <div>
+          <p class="lead">Multiply once more by \(K\).</p>
+          <div class="equation">
+            \[
+            K^3=K(\boldsymbol\omega\boldsymbol\omega^T-I)
+            =(K\boldsymbol\omega)\boldsymbol\omega^T-K.
+            \]
+          </div>
+          <p>Because \(K\boldsymbol\omega=\boldsymbol\omega\times\boldsymbol\omega=\mathbf0\),</p>
+          <div class="equation">\[\boxed{K^3=-K},\qquad \boxed{K^4=-K^2}.\]</div>
+        </div>
       </div>
-      <div class="clean-callout"><strong>Pure translation:</strong> when \(\boldsymbol\omega=\mathbf0\), \(e^{\widehat{\boldsymbol\xi}\theta}=\begin{bmatrix}I&\mathbf v\theta\\0&1\end{bmatrix}\).</div>
+      <p class="slide-takeaway"><strong>Consequence:</strong> every higher power reduces to either \(K\) or \(K^2\).</p>
     </section>
 
     <section class="slide">
-      <p class="slide-kicker">Act II · Notation before changing frames</p>
-      <h2 class="slide-title">A physical screw also needs coordinates</h2>
-      <p class="slide-subtitle">The motion is unchanged when the observer changes, but its six coordinate values generally change.</p>
+      <p class="slide-kicker">Act II · Rodrigues derivation 2/3</p>
+      <h2 class="slide-title">Regroup the exponential into odd and even powers</h2>
+      <p class="slide-subtitle">Substitute \(K^3=-K\) and \(K^4=-K^2\) into the Taylor series.</p>
+      <div class="equation rodrigues-series">
+        \[
+        \begin{aligned}
+        e^{K\theta}
+        &=I+K\theta+\frac{K^2\theta^2}{2!}
+          +\frac{K^3\theta^3}{3!}
+          +\frac{K^4\theta^4}{4!}+\cdots\\[2mm]
+        &=I+
+          K\left(\theta-\frac{\theta^3}{3!}+\frac{\theta^5}{5!}-\cdots\right)
+          +K^2\left(\frac{\theta^2}{2!}-\frac{\theta^4}{4!}
+          +\frac{\theta^6}{6!}-\cdots\right).
+        \end{aligned}
+        \]
+      </div>
       <div class="layout-two-column divided">
-        <div class="definition"><strong>New notation</strong><p>\({}^{A}\boldsymbol\xi\): twist coordinates expressed in frame \(A\).</p><p>\({}^{A}T_B\): pose of frame \(B\), expressed in \(A\).</p><p>\(\operatorname{Ad}_T\): adjoint map that changes twist coordinates between frames.</p></div>
-        <div><div class="equation">\[\operatorname{Ad}_{T}=\begin{bmatrix}R&0\\[\mathbf t]_\times R&R\end{bmatrix}\]</div><div class="equation">\[{}^{A}\boldsymbol\xi=\operatorname{Ad}_{{}^{A}T_B}\,{}^{B}\boldsymbol\xi\]</div></div>
+        <div class="series-card"><strong>Odd coefficient</strong><div class="equation">\[\theta-\frac{\theta^3}{3!}+\frac{\theta^5}{5!}-\cdots=\sin\theta\]</div></div>
+        <div class="series-card"><strong>Even coefficient</strong><div class="equation">\[\frac{\theta^2}{2!}-\frac{\theta^4}{4!}+\frac{\theta^6}{6!}-\cdots=1-\cos\theta\]</div></div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <p class="slide-kicker">Act II · Rodrigues derivation 3/3</p>
+      <h2 class="slide-title">Rodrigues’ formula is the closed-form exponential</h2>
+      <p class="slide-subtitle">Insert the sine and cosine series, then interpret how the three terms act on a vector.</p>
+      <div class="equation">
+        \[
+        \boxed{
+        R(\theta)=e^{[\boldsymbol\omega]_\times\theta}
+        =I+\sin\theta[\boldsymbol\omega]_\times
+        +(1-\cos\theta)[\boldsymbol\omega]_\times^2
+        }
+        \]
+      </div>
+      <div class="rodrigues-meaning">
+        <div><strong>\(I\mathbf p\)</strong><p>starts from the original vector</p></div>
+        <div><strong>\(\sin\theta\,(\boldsymbol\omega\times\mathbf p)\)</strong><p>moves in the tangential direction</p></div>
+        <div><strong>\((1-\cos\theta)\boldsymbol\omega\times(\boldsymbol\omega\times\mathbf p)\)</strong><p>supplies the radial correction</p></div>
+      </div>
+      <div class="clean-callout"><strong>Check:</strong> at \(\theta=0\), \(R=I\); differentiating at zero gives \(\left.\frac{dR}{d\theta}\right|_0=[\boldsymbol\omega]_\times\).</div>
+    </section>
+
+    <section class="slide">
+      <p class="slide-kicker">Act II · From rotation to rigid transformation</p>
+      <h2 class="slide-title">The same exponential generates the full pose</h2>
+      <p class="slide-subtitle">Rodrigues provides the rotational block; integrating the twist’s linear component provides the translation.</p>
+      <div class="layout-two-column divided">
+        <div>
+          <div class="equation">
+            \[
+            e^{\widehat{\boldsymbol\xi}\theta}
+            =
+            \begin{bmatrix}
+            R(\theta)&G(\theta)\mathbf v\\
+            \mathbf0^T&1
+            \end{bmatrix}
+            \]
+          </div>
+          <div class="equation">
+            \[
+            G(\theta)=I\theta+(1-\cos\theta)K+(\theta-\sin\theta)K^2.
+            \]
+          </div>
+        </div>
+        <div>
+          <p>Using \(K=[\boldsymbol\omega]_\times\), the same translation can be written as</p>
+          <div class="equation">
+            \[
+            G(\theta)\mathbf v
+            =(I-R)(\boldsymbol\omega\times\mathbf v)
+            +\boldsymbol\omega\boldsymbol\omega^T\mathbf v\,\theta.
+            \]
+          </div>
+          <div class="definition"><strong>Pure translation:</strong> if \(\boldsymbol\omega=\mathbf0\), then \(R=I\) and \(\mathbf t=\mathbf v\theta\).</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <p class="slide-kicker">Act II · The adjoint map</p>
+      <h2 class="slide-title">One physical motion, different twist coordinates</h2>
+      <p class="slide-subtitle">The adjoint is the \(6\times6\) coordinate-change matrix induced by a rigid transformation. It rotates both components and accounts for the shift of origin.</p>
+      <div class="adjoint-layout">
+        <div class="definition">
+          <strong>Notation</strong>
+          <p>\({}^{A}\boldsymbol\xi=[{}^{A}\boldsymbol\omega;\,{}^{A}\mathbf v]\): twist coordinates expressed in \(A\).</p>
+          <p>\({}^{A}T_B=(R,\mathbf t)\): pose of \(B\) expressed in \(A\).</p>
+          <p>\(\operatorname{Ad}_T\): adjoint representation of \(T\).</p>
+        </div>
+        <div class="adjoint-formula">
+          <div class="equation">
+            \[
+            \operatorname{Ad}_{T}
+            =
+            \begin{bmatrix}
+            R&0\\
+            [\mathbf t]_\times R&R
+            \end{bmatrix},
+            \qquad
+            {}^{A}\boldsymbol\xi
+            =
+            \operatorname{Ad}_{{}^{A}T_B}\,{}^{B}\boldsymbol\xi.
+            \]
+          </div>
+          <p><strong>Why the lower-left block?</strong> Moving the coordinate origin changes linear velocity by \(\mathbf t\times\boldsymbol\omega\), even though the rigid-body motion is unchanged.</p>
+        </div>
+      </div>
+      <div class="adjoint-uses">
+        <div><strong>Change screw coordinates</strong><p>Express a joint axis from its local URDF frame in world or tool coordinates.</p></div>
+        <div><strong>Relate Jacobians</strong><p>Convert between space and body Jacobians: \(J_s=\operatorname{Ad}_{T}J_b\).</p></div>
+        <div><strong>Transform velocities</strong><p>Move spatial or body twists between sensor, base, and end-effector frames.</p></div>
+        <div><strong>Move forces dually</strong><p>Wrenches use the inverse transpose: \(\mathcal F_A=\operatorname{Ad}_{T}^{-T}\mathcal F_B\).</p></div>
       </div>
     </section>
 

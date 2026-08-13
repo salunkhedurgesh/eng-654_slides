@@ -90,6 +90,58 @@
   border: 1px solid var(--line);
   border-top: 4px solid var(--black);
 }
+
+.rodrigues-series { font-size: clamp(1rem, 1.45vw, 1.55rem); }
+.series-card {
+  align-self: center;
+  padding: 0.65rem;
+  border-top: 3px solid var(--black);
+  background: #fafafa;
+  text-align: center;
+}
+.series-card:last-child { border-top-color: var(--epfl-red); }
+.series-card .equation { margin-block: 0.45rem; }
+.rodrigues-meaning {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+  margin: var(--vgap-sm) 0;
+}
+.rodrigues-meaning > div {
+  padding: 0.65rem;
+  border-top: 4px solid var(--black);
+  background: #fafafa;
+}
+.rodrigues-meaning > div:nth-child(2) { border-top-color: var(--epfl-red); }
+.rodrigues-meaning p { margin-bottom: 0; }
+
+.adjoint-layout {
+  display: grid;
+  grid-template-columns: minmax(18rem, .72fr) minmax(0, 1.28fr);
+  gap: 0.7rem;
+}
+.adjoint-layout .definition { margin: 0; }
+.adjoint-formula {
+  padding: 0.65rem;
+  border: 1px solid var(--line);
+  border-top: 4px solid var(--black);
+}
+.adjoint-formula .equation { margin-block: 0.35rem; }
+.adjoint-uses {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin-top: 0.6rem;
+  min-height: 0;
+}
+.adjoint-uses > div {
+  padding: 0.55rem;
+  border-top: 3px solid var(--black);
+  background: #fafafa;
+}
+.adjoint-uses > div:nth-child(2) { border-top-color: var(--epfl-red); }
+.adjoint-uses p { margin: 0.3rem 0 0; font-size: 0.9em; }
 .screw-cases { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.55rem; align-content: center; height: 100%; }
 .screw-cases > div { padding: 0.8rem; border-top: 4px solid var(--black); background: #fafafa; }
 .screw-cases > div:nth-child(2) { border-top-color: var(--epfl-red); }
@@ -276,6 +328,9 @@
   .representation-compare,
   .challenge-strip,
   .poe-extraction-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rodrigues-meaning,
+  .adjoint-uses { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .adjoint-layout { grid-template-columns: 1fr; }
   .l2-demo,
   .urdf-editor-demo { grid-template-columns: 1fr; grid-template-rows: minmax(18rem, 1fr) auto; }
 }

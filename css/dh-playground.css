@@ -512,6 +512,73 @@
   background: #fafafa;
 }
 
+/* Lecture narrative layer: hierarchy, context, and readable transitions. */
+.narrative-lecture .slide-kicker {
+  margin: 0 0 0.35rem;
+  color: var(--epfl-red);
+  font-size: var(--font-small);
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.narrative-lecture .slide-title {
+  margin-bottom: 0.35rem;
+  font-size: clamp(2rem, 3.05vw, 3.55rem);
+}
+
+.narrative-lecture .slide-subtitle {
+  max-width: 78ch;
+  margin: 0 0 var(--vgap-sm);
+  color: var(--muted);
+  font-size: clamp(1rem, 1.35vw, 1.45rem);
+  line-height: 1.35;
+}
+
+.lecture-promise {
+  max-width: 62ch;
+  margin: var(--vgap-md) auto 0;
+  padding-top: var(--vgap-sm);
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: clamp(1rem, 1.25vw, 1.35rem);
+  line-height: 1.45;
+}
+
+.demo-prompt,
+.bridge-note,
+.slide-takeaway {
+  padding: 0.45rem 0.65rem;
+  border-left: 3px solid var(--epfl-red);
+  background: color-mix(in srgb, var(--epfl-red) 4%, white);
+  font-size: clamp(0.88rem, 1.05vw, 1.1rem);
+  line-height: 1.35;
+}
+
+.demo-prompt {
+  margin: 0 0 0.55rem;
+}
+
+.bridge-note {
+  margin: var(--vgap-sm) 0 0;
+  color: var(--muted);
+}
+
+.slide-takeaway {
+  width: 100%;
+  max-width: none;
+  margin: 0.55rem 0 0;
+}
+
+.demo-layout {
+  min-height: 0;
+}
+
+.narrative-lecture .title-slide .subtitle {
+  max-width: 48ch;
+  margin-inline: auto;
+}
+
 .dh-convention-strip {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

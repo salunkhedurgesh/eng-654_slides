@@ -509,6 +509,8 @@ function createDHPlayground(container) {
     connectionObjects: [],
     robotRoot: new THREE.Group(),
     robotMode: 'default',
+    bundledRobotModel: null,
+    bundledRobotVisuals: [],
     robotMeshesVisible: true,
     robotOpacity: 0.65,
     showLabels: true,
@@ -551,6 +553,8 @@ function createDHPlayground(container) {
       state.robotRoot.remove(object);
       disposeObject(object);
     });
+    state.bundledRobotModel = null;
+    state.bundledRobotVisuals = [];
   }
 
   function applyRobotDisplay() {
@@ -615,6 +619,23 @@ function createDHPlayground(container) {
       state.robotRoot.add(joint);
     });
     applyRobotDisplay();
+  }
+
+  function updateBundledRobotVisuals() {
+    if (state.robotMode !== 'bundled' || !state.bundledRobotModel) return;
+
+    const jointAngles = new Map();
+    for (let i = 1; i <= 3; i += 1) {
+      const theta = state.frames.get('F' + i)?.params?.theta;
+      if (Number.isFinite(theta)) jointAngles.set('joint_' + i, theta);
+    }
+    const linkMatrices = computeUrdfLinkMatrices(state.bundledRobotModel, jointAngles);
+    state.bundledRobotVisuals.forEach((visual) => {
+      const linkMatrix = linkMatrices.get(visual.linkName);
+      if (!linkMatrix) return;
+      visual.group.matrix.multiplyMatrices(linkMatrix, visual.origin);
+      visual.group.matrixWorldNeedsUpdate = true;
+    });
   }
 
   function fitCameraToRobot() {
@@ -719,6 +740,8 @@ function createDHPlayground(container) {
 
     state.robotMode = 'bundled';
     clearRobotVisuals();
+    state.robotMode = 'bundled';
+    state.bundledRobotModel = model;
     let loadedMeshes = 0;
     for (const [linkName, link] of model.links) {
       const linkMatrix = linkMatrices.get(linkName);
@@ -742,10 +765,12 @@ function createDHPlayground(container) {
         if (visual.geometry.scale) mesh.scale.fromArray(visual.geometry.scale);
         group.add(mesh);
         state.robotRoot.add(group);
+        state.bundledRobotVisuals.push({ linkName, group, origin: visual.origin.clone() });
         loadedMeshes += 1;
       }
     }
     applyRobotDisplay();
+    updateBundledRobotVisuals();
     fitCameraToRobot();
     els.robotStatus.textContent = 'Default: custom_3R URDF with ' + loadedMeshes + ' STL visuals and DH frames F0–F3.';
   }
@@ -905,6 +930,7 @@ function createDHPlayground(container) {
     }
     rebuildConnections();
     rebuildDefaultRobotVisuals();
+    updateBundledRobotVisuals();
   }
 
   function frameOptionsHtml() {
@@ -1005,6 +1031,31 @@ function createDHPlayground(container) {
   function note(message) {
     els.liveNote.textContent = message;
   }
+
+  function previewSelectedDHParameters() {
+    const frame = state.frames.get(state.selectedId);
+    if (!frame || frame.type !== 'dh') return;
+    const values = {
+      a: paramInput('a').valueAsNumber,
+      alpha: paramInput('alpha').valueAsNumber,
+      d: paramInput('d').valueAsNumber,
+      theta: paramInput('theta').valueAsNumber
+    };
+    if (Object.values(values).some((value) => !Number.isFinite(value))) return;
+
+    frame.params = {
+      a: values.a,
+      alpha: values.alpha * DEG,
+      d: values.d,
+      theta: values.theta * DEG
+    };
+    updateVisuals();
+    updateInference();
+  }
+
+  ['a', 'alpha', 'd', 'theta'].forEach((key) => {
+    paramInput(key).addEventListener('input', previewSelectedDHParameters);
+  });
 
   els.add.addEventListener('click', () => {
     const parentId = els.parentSelect.value || 'W';
@@ -1188,7 +1239,12 @@ function parseUrdf(xmlText) {
       type: jointElement.getAttribute('type') || 'fixed',
       parent: directChild(jointElement, 'parent')?.getAttribute('link') || '',
       child: directChild(jointElement, 'child')?.getAttribute('link') || '',
-      origin: urdfOrigin(jointElement)
+      origin: urdfOrigin(jointElement),
+      axis: new THREE.Vector3(...numberList(
+        directChild(jointElement, 'axis')?.getAttribute('xyz'),
+        [1, 0, 0]
+      )).normalize(),
+      position: 0
     }))
     .filter((joint) => links.has(joint.parent) && links.has(joint.child));
 
@@ -1204,7 +1260,7 @@ function parseUrdf(xmlText) {
   };
 }
 
-function computeUrdfLinkMatrices(model) {
+function computeUrdfLinkMatrices(model, jointAngles = new Map()) {
   const matrices = new Map();
   const jointsByParent = new Map();
   model.joints.forEach((joint) => {
@@ -1214,7 +1270,13 @@ function computeUrdfLinkMatrices(model) {
   const visit = (linkName, worldMatrix) => {
     matrices.set(linkName, worldMatrix);
     (jointsByParent.get(linkName) || []).forEach((joint) => {
-      visit(joint.child, new THREE.Matrix4().multiplyMatrices(worldMatrix, joint.origin));
+      const angle = jointAngles.get(joint.name) ?? joint.position ?? 0;
+      joint.position = angle;
+      const motion = joint.type === 'revolute' || joint.type === 'continuous'
+        ? new THREE.Matrix4().makeRotationAxis(joint.axis, angle)
+        : new THREE.Matrix4();
+      const localMatrix = new THREE.Matrix4().multiplyMatrices(joint.origin, motion);
+      visit(joint.child, new THREE.Matrix4().multiplyMatrices(worldMatrix, localMatrix));
     });
   };
   model.roots.forEach((rootName) => visit(rootName, new THREE.Matrix4()));

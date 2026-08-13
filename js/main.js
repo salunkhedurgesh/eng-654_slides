@@ -17,6 +17,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     async () => {
       const module = await import('./viz/frameDHPlayground.js');
       module.initFrameDHPlaygrounds?.();
+    },
+    async () => {
+      const module = await import('./viz/poeUrdfPlayground.js');
+      module.initPoeUrdfPlaygrounds?.();
     }
   ];
 

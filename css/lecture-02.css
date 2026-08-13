@@ -318,6 +318,9 @@
 
 .urdf-editor-demo { grid-template-columns: minmax(24rem, 1fr) minmax(0, 1fr); }
 .urdf-editor-pane { min-width: 0; min-height: 0; display: grid; grid-template-rows: auto 1fr auto; gap: 0.35rem; }
+.urdf-editor-toolbar { display: flex; justify-content: space-between; gap: 0.7rem; align-items: center; }
+.urdf-upload-button { position: relative; overflow: hidden; margin: 0; padding: 0.34rem 0.7rem; cursor: pointer; }
+.urdf-upload-button input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .urdf-editor-pane textarea {
   width: 100%;
   height: 100%;
@@ -330,8 +333,8 @@
 }
 .urdf-editor-status { margin: 0; min-height: 1.4em; color: var(--muted); }
 .urdf-editor-status.is-error { color: var(--epfl-red); font-weight: 700; }
-.urdf-frame-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
-.urdf-frame-controls .l2-control { grid-template-columns: 3.5rem 1fr 3.4rem; margin: 0; }
+.urdf-frame-controls { display: grid; grid-template-columns: 1fr; gap: 0.4rem; }
+.urdf-frame-controls .l2-control { grid-template-columns: minmax(5rem, auto) 1fr 3.4rem; margin: 0; }
 
 @media (max-width: 900px) {
   .lecture-02-title { white-space: normal; }

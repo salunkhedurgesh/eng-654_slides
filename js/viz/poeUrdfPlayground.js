@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { createBoldAxes, createZUpWorld, resizeRendererToContainer } from './threeUtils.js';
-import { parseStlGeometry } from './frameDHPlayground.js?v=20260814';
+import { parseStlGeometry } from './frameDHPlayground.js?v=20260814-2';
 
 const DEG = Math.PI / 180;
 const EPS = 1e-8;
@@ -409,77 +409,190 @@ function createUrdfEditorDemo(container) {
   container.className = 'l2-demo urdf-editor-demo';
   container.innerHTML = `
     <div class="urdf-editor-pane">
-      <strong>Editable URDF</strong>
-      <textarea data-urdf spellcheck="false" aria-label="Editable two-frame URDF"></textarea>
-      <p class="urdf-editor-status" data-status>Valid URDF · drag either frame in the XY plane</p>
+      <div class="urdf-editor-toolbar">
+        <strong>Editable URDF</strong>
+        <label class="control-button urdf-upload-button">Upload URDF<input data-urdf-upload type="file" accept=".urdf,.xml,text/xml,application/xml"></label>
+      </div>
+      <textarea data-urdf spellcheck="false" aria-label="Editable URDF source"></textarea>
+      <p class="urdf-editor-status" data-status>Reading link and joint frames…</p>
     </div>
     <div class="l2-panel">
-      <div class="l2-stage"><p class="l2-stage-note">drag frame origins · orbit empty space</p></div>
+      <div class="l2-stage"><p class="l2-stage-note">every link gets a frame · drag non-root origins · orbit empty space</p></div>
       <div class="l2-card urdf-frame-controls">
-        <div class="l2-control"><label>A.z</label><input data-z="a" type="range" min="0" max="2" step=".05" value=".4"><output data-z-out="a">0.40</output></div>
-        <div class="l2-control"><label>B.z</label><input data-z="b" type="range" min="0" max="2" step=".05" value=".75"><output data-z-out="b">0.75</output></div>
+        <div class="l2-control"><label data-selected-label>Frame z</label><input data-frame-z type="range" min="-5" max="5" step=".01" value="0" disabled><output data-frame-z-out>—</output></div>
       </div>
     </div>`;
   const textarea = container.querySelector('[data-urdf]'), status = container.querySelector('[data-status]');
+  const zInput = container.querySelector('[data-frame-z]'), zOutput = container.querySelector('[data-frame-z-out]');
+  const selectedLabel = container.querySelector('[data-selected-label]');
   textarea.value = DEFAULT_URDF;
-  const kit = sceneKit(container.querySelector('.l2-stage'), [4.1,3.4,3.8]); kit.controls.target.set(.8,.3,.4);
-  const aVisual = frame('A', .7, true), bVisual = frame('B', .7, true);
-  aVisual.marker.userData.dragFrame = 'a'; bVisual.marker.userData.dragFrame = 'b'; kit.world.add(aVisual.group, bVisual.group);
-  let connector = line([], 0x333333, .7); kit.world.add(connector); let state = null;
+  const kit = sceneKit(container.querySelector('.l2-stage'), [4.1,3.4,3.8]);
+  kit.controls.target.set(.8,.3,.4);
+  const visuals = [], visualByLink = new Map();
+  let connectors = [], state = null, selectedLink = null;
 
   function parse(text) {
     const doc = new DOMParser().parseFromString(text, 'application/xml');
     if (doc.querySelector('parsererror')) throw new Error('XML is not well formed.');
-    const readJoint = (name) => {
-      const joint = [...doc.querySelectorAll('joint')].find((item) => item.getAttribute('name') === name);
-      if (!joint) throw new Error(`Missing joint "${name}".`);
-      const origin = [...joint.children].find((child) => child.tagName.toLowerCase() === 'origin');
-      if (!origin) throw new Error(`Joint "${name}" needs an <origin>.`);
-      return { xyz: numbers(origin.getAttribute('xyz'), 3), rpy: numbers(origin.getAttribute('rpy') || '0 0 0', 3) };
-    };
-    return { a: readJoint('world_to_a'), b: readJoint('a_to_b') };
+    const robot = doc.documentElement;
+    if (robot?.tagName.toLowerCase() !== 'robot') throw new Error('The root element must be <robot>.');
+    const linkNames = [...robot.children]
+      .filter((item) => item.tagName.toLowerCase() === 'link')
+      .map((item) => item.getAttribute('name'));
+    if (!linkNames.length || linkNames.some((name) => !name)) throw new Error('Every <link> needs a name.');
+    if (new Set(linkNames).size !== linkNames.length) throw new Error('Link names must be unique.');
+    const linkSet = new Set(linkNames);
+    const incoming = new Map(), children = new Map(linkNames.map((name) => [name, []]));
+    const joints = [...robot.children]
+      .filter((item) => item.tagName.toLowerCase() === 'joint')
+      .map((joint, index) => {
+        const name = joint.getAttribute('name') || `joint_${index + 1}`;
+        const parent = [...joint.children].find((item) => item.tagName.toLowerCase() === 'parent')?.getAttribute('link');
+        const child = [...joint.children].find((item) => item.tagName.toLowerCase() === 'child')?.getAttribute('link');
+        if (!linkSet.has(parent) || !linkSet.has(child)) throw new Error(`Joint "${name}" must reference declared parent and child links.`);
+        if (parent === child) throw new Error(`Joint "${name}" cannot connect a link to itself.`);
+        if (incoming.has(child)) throw new Error(`Link "${child}" has more than one parent joint.`);
+        const origin = [...joint.children].find((item) => item.tagName.toLowerCase() === 'origin');
+        const result = {
+          name, parent, child,
+          xyz: numbers(origin?.getAttribute('xyz') || '0 0 0', 3),
+          rpy: numbers(origin?.getAttribute('rpy') || '0 0 0', 3)
+        };
+        incoming.set(child, result);
+        children.get(parent).push(result);
+        return result;
+      });
+    const roots = linkNames.filter((name) => !incoming.has(name));
+    if (roots.length !== 1) throw new Error(`URDF needs one root link; found ${roots.length}.`);
+    const visited = new Set(), transforms = new Map();
+    function visit(linkName, transform) {
+      if (visited.has(linkName)) throw new Error(`A cycle reaches link "${linkName}".`);
+      visited.add(linkName);
+      transforms.set(linkName, transform);
+      children.get(linkName).forEach((joint) => {
+        visit(joint.child, transform.clone().multiply(rpyMatrix(...joint.xyz, ...joint.rpy)));
+      });
+    }
+    visit(roots[0], new THREE.Matrix4());
+    if (visited.size !== linkNames.length) throw new Error('Every link must be connected to the root by a joint.');
+    return { links: linkNames, joints, root: roots[0], incoming, transforms };
   }
 
-  function matrices() {
-    const a = rpyMatrix(...state.a.xyz, ...state.a.rpy);
-    return { a, b: a.clone().multiply(rpyMatrix(...state.b.xyz, ...state.b.rpy)) };
+  function disposeObject(object) {
+    kit.world.remove(object);
+    object.traverse((child) => {
+      child.geometry?.dispose?.();
+      if (child.material?.map) child.material.map.dispose();
+      child.material?.dispose?.();
+    });
   }
+
   function updateVisuals() {
     if (!state) return;
-    const m = matrices();
-    aVisual.group.matrix.copy(m.a); bVisual.group.matrix.copy(m.b);
-    aVisual.group.matrixWorldNeedsUpdate = true; bVisual.group.matrixWorldNeedsUpdate = true;
-    const pa = new THREE.Vector3().setFromMatrixPosition(m.a), pb = new THREE.Vector3().setFromMatrixPosition(m.b);
-    kit.world.remove(connector); connector.geometry.dispose(); connector.material.dispose(); connector = line([pa,pb], 0x333333, .75); kit.world.add(connector);
-    container.querySelector('[data-z="a"]').value = state.a.xyz[2]; container.querySelector('[data-z-out="a"]').textContent = format(state.a.xyz[2],2);
-    container.querySelector('[data-z="b"]').value = pb.z; container.querySelector('[data-z-out="b"]').textContent = format(pb.z,2);
+    [...visualByLink.keys()].filter((name) => !state.transforms.has(name)).forEach((name) => {
+      const visual = visualByLink.get(name);
+      disposeObject(visual.group);
+      visualByLink.delete(name);
+      visuals.splice(visuals.indexOf(visual), 1);
+    });
+    state.links.forEach((name) => {
+      let visual = visualByLink.get(name);
+      if (!visual) {
+        visual = frame(name, name === state.root ? .62 : .55, name !== state.root);
+        visual.marker.userData.dragFrame = name;
+        visualByLink.set(name, visual);
+        visuals.push(visual);
+        kit.world.add(visual.group);
+      }
+      visual.marker.userData.dragFrame = name;
+      visual.group.matrix.copy(state.transforms.get(name));
+      visual.group.matrixWorldNeedsUpdate = true;
+    });
+    connectors.forEach(disposeObject);
+    connectors = state.joints.map((joint) => {
+      const parent = new THREE.Vector3().setFromMatrixPosition(state.transforms.get(joint.parent));
+      const child = new THREE.Vector3().setFromMatrixPosition(state.transforms.get(joint.child));
+      const connector = line([parent, child], 0x333333, .72);
+      kit.world.add(connector);
+      return connector;
+    });
+    if (!selectedLink || !state.transforms.has(selectedLink)) {
+      selectedLink = state.links.find((name) => name !== state.root) || state.root;
+    }
+    const selectedPosition = new THREE.Vector3().setFromMatrixPosition(state.transforms.get(selectedLink));
+    selectedLabel.textContent = `${selectedLink}.z`;
+    zInput.disabled = selectedLink === state.root;
+    zInput.value = selectedPosition.z;
+    zOutput.textContent = format(selectedPosition.z, 2);
   }
-  function readEditor() {
+
+  function readEditor(sourceName = '') {
     try {
-      state = parse(textarea.value); updateVisuals(); status.textContent = 'Valid URDF · drag either frame in the XY plane'; status.classList.remove('is-error');
-    } catch (error) { status.textContent = error.message; status.classList.add('is-error'); }
+      state = parse(textarea.value);
+      updateVisuals();
+      status.textContent = `${sourceName ? `${sourceName} · ` : ''}Valid URDF · ${state.links.length} link frames · ${state.joints.length} joints`;
+      status.classList.remove('is-error');
+    } catch (error) {
+      status.textContent = error.message;
+      status.classList.add('is-error');
+    }
   }
+
   function replaceOrigin(jointName, xyz) {
-    const jointPattern = new RegExp(`(<joint\\s+name=["']${jointName}["'][\\s\\S]*?<origin\\s+[^>]*xyz=["'])[^"']*(["'])`);
-    textarea.value = textarea.value.replace(jointPattern, `$1${xyz.map((n) => format(n,2)).join(' ')}$2`); readEditor();
+    const escapedName = jointName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const jointPattern = new RegExp(`(<joint\\b(?=[^>]*\\bname=["']${escapedName}["'])[^>]*>)([\\s\\S]*?)(<\\/joint>)`);
+    const match = textarea.value.match(jointPattern);
+    if (!match) return;
+    const value = xyz.map((number) => format(number, 3)).join(' ');
+    let body = match[2];
+    if (/<origin\b[^>]*>/i.test(body)) {
+      body = body.replace(/<origin\b([^>]*)>/i, (tag, attributes) => {
+        const updated = /\bxyz=["'][^"']*["']/i.test(attributes)
+          ? attributes.replace(/\bxyz=["'][^"']*["']/i, `xyz="${value}"`)
+          : `${attributes} xyz="${value}"`;
+        return `<origin${updated}>`;
+      });
+    } else {
+      body = `\n    <origin xyz="${value}" rpy="0 0 0"/>${body}`;
+    }
+    textarea.value = textarea.value.replace(jointPattern, `$1${body}$3`);
+    readEditor();
   }
+
   let timer = 0;
-  textarea.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(readEditor, 180); });
-  container.querySelectorAll('[data-z]').forEach((input) => input.addEventListener('input', () => {
-    if (!state) return;
-    if (input.dataset.z === 'a') { state.a.xyz[2] = Number(input.value); replaceOrigin('world_to_a', state.a.xyz); }
-    else {
-      const m = matrices(), desired = new THREE.Vector3().setFromMatrixPosition(m.b); desired.z = Number(input.value);
-      state.b.xyz = desired.applyMatrix4(m.a.clone().invert()).toArray(); replaceOrigin('a_to_b', state.b.xyz);
+  textarea.addEventListener('input', () => {
+    clearTimeout(timer);
+    timer = setTimeout(readEditor, 180);
+  });
+  container.querySelector('[data-urdf-upload]').addEventListener('change', async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      textarea.value = await file.text();
+      selectedLink = null;
+      readEditor(file.name);
+    } catch (error) {
+      status.textContent = `Could not read ${file.name}: ${error.message}`;
+      status.classList.add('is-error');
     }
-  }));
-  enableFrameDrag(kit, [aVisual, bVisual], (id, worldPosition) => {
-    if (!state) return;
-    if (id === 'a') { state.a.xyz[0] = worldPosition.x; state.a.xyz[1] = worldPosition.y; replaceOrigin('world_to_a', state.a.xyz); }
-    else {
-      const local = worldPosition.clone().applyMatrix4(matrices().a.clone().invert());
-      state.b.xyz[0] = local.x; state.b.xyz[1] = local.y; replaceOrigin('a_to_b', state.b.xyz);
-    }
+    event.target.value = '';
+  });
+  zInput.addEventListener('input', () => {
+    if (!state || !selectedLink || selectedLink === state.root) return;
+    const joint = state.incoming.get(selectedLink);
+    const desired = new THREE.Vector3().setFromMatrixPosition(state.transforms.get(selectedLink));
+    desired.z = Number(zInput.value);
+    joint.xyz = desired.applyMatrix4(state.transforms.get(joint.parent).clone().invert()).toArray();
+    replaceOrigin(joint.name, joint.xyz);
+  });
+  enableFrameDrag(kit, visuals, (id, worldPosition) => {
+    if (!state || id === state.root) return;
+    selectedLink = id;
+    const joint = state.incoming.get(id);
+    const local = worldPosition.clone().applyMatrix4(state.transforms.get(joint.parent).clone().invert());
+    joint.xyz[0] = local.x;
+    joint.xyz[1] = local.y;
+    replaceOrigin(joint.name, joint.xyz);
   });
   readEditor();
 }

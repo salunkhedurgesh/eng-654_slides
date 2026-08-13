@@ -425,12 +425,12 @@ async function createSerialFrameDemo(container) {
           <label for="puma-target-${uid(container)}">Target frame B</label>
           <select id="puma-target-${uid(container)}" data-puma-target></select>
         </div>
-        <p class="dh-help">\\({}^{A}T_B\\) maps coordinates expressed in B into coordinates expressed in A. Frames F₁–F₃ are the three URDF joint-child frames.</p>
+        <p class="dh-help">\\({}^{A}T_B\\) maps coordinates expressed in B into coordinates expressed in A. F₁–F₃ are joint frames; F₄ is the fixed end-effector frame at <code>tool0</code>.</p>
       </div>
       <div class="puma-transform-card" aria-live="polite">
         <div class="puma-transform-heading">
           <strong>Selected transform</strong>
-          <span data-puma-transform-name>world ← F₃</span>
+          <span data-puma-transform-name>world ← F₄</span>
         </div>
         <table class="pose-matrix" aria-label="Selected homogeneous transformation matrix">
           <tbody data-puma-transform-matrix></tbody>
@@ -526,6 +526,18 @@ async function createSerialFrameDemo(container) {
       matrix: linkMatrices.get(joint.child).clone()
     });
   });
+  const lastJointChild = revoluteJoints.at(-1).child;
+  const endEffectorJoint = model.joints.find((joint) => (
+    joint.type === 'fixed' && joint.parent === lastJointChild && linkMatrices.has(joint.child)
+  ));
+  if (!endEffectorJoint) throw new Error('The bundled custom_3R model contains no fixed end-effector frame.');
+  const endEffectorIndex = revoluteJoints.length + 1;
+  frames.push({
+    id: 'F' + endEffectorIndex,
+    label: 'F' + String.fromCharCode(0x2080 + endEffectorIndex),
+    optionLabel: 'F' + String.fromCharCode(0x2080 + endEffectorIndex) + ' (end effector)',
+    matrix: linkMatrices.get(endEffectorJoint.child).clone()
+  });
 
   const labelOffsets = [
     [-0.18, -0.18, 0.15],
@@ -571,7 +583,7 @@ async function createSerialFrameDemo(container) {
   const hideFramesButton = container.querySelector('[data-puma-hide-frames]');
   const revealNextButton = container.querySelector('[data-puma-reveal-next]');
   const showFramesButton = container.querySelector('[data-puma-show-frames]');
-  const options = frames.map((frame) => `<option value="${frame.id}">${frame.label}</option>`).join('');
+  const options = frames.map((frame) => `<option value="${frame.id}">${frame.optionLabel || frame.label}</option>`).join('');
   baseSelect.innerHTML = options;
   targetSelect.innerHTML = options;
   frameChecks.innerHTML = frames.map((frame) => `

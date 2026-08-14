@@ -244,9 +244,12 @@
 .branch-node p { margin-bottom: 0; }
 
 .source-note {
-  margin-top: auto;
+  /* margin-top: 1 rem; */
+  margin: 0.1rem;
   color: var(--muted);
   font-size: clamp(0.62rem, 0.72vw, 0.78rem);
+  /* outline: 2px dotted green; */
+  max-width: none;
 }
 
 /* Lecture-specific Three.js application scenes. */
@@ -304,7 +307,96 @@
 }
 
 .ik3r-note.is-error { color: var(--epfl-red); }
-.ik3r-controls { position: absolute; right: .55rem; top: .55rem; z-index: 3; }
+.ik3r-controls {
+  position: absolute;
+  right: .55rem;
+  top: .55rem;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  padding: .28rem .4rem;
+  border: 1px solid rgba(0, 0, 0, .12);
+  background: rgba(255, 255, 255, .94);
+  font-size: clamp(.68rem, .78vw, .86rem);
+}
+
+.ik3r-control-label,
+.ik3r-label-toggle {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.ik3r-label-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  cursor: pointer;
+}
+
+.ik3r-label-toggle input { margin: 0; }
+
+.ik3r-state-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: .22rem;
+  color: var(--muted);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ik3r-state-toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ik3r-switch-track {
+  position: relative;
+  width: 1.65rem;
+  height: .9rem;
+  border-radius: 1rem;
+  background: #b9bec4;
+  transition: background .15s ease;
+}
+
+.ik3r-switch-track::after {
+  content: '';
+  position: absolute;
+  top: .12rem;
+  left: .12rem;
+  width: .66rem;
+  height: .66rem;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .28);
+  transition: transform .15s ease;
+}
+
+.ik3r-state-toggle input:checked + .ik3r-switch-track { background: var(--epfl-red); }
+.ik3r-state-toggle input:checked + .ik3r-switch-track::after { transform: translateX(.75rem); }
+.ik3r-state-toggle input:focus-visible + .ik3r-switch-track { outline: 2px solid #2775ff; outline-offset: 2px; }
+
+.ik3r-slider-control {
+  display: inline-grid;
+  grid-template-columns: auto 4.6rem 2.4rem;
+  align-items: center;
+  gap: .2rem;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.ik3r-slider-control input { width: 4.6rem; }
+.ik3r-slider-control output { font-variant-numeric: tabular-nums; text-align: right; }
+
+.ik3r-label-select {
+  min-width: 5.2rem;
+  padding: .14rem .25rem;
+  border: 1px solid var(--line);
+  background: var(--white);
+  color: var(--ink);
+  font: inherit;
+}
 
 .custom3r-numeric-card {
   min-width: 0;

@@ -7,7 +7,7 @@
 document.addEventListener('DOMContentLoaded', async () => {
   // Keep the visualization module graph on one revision. This prevents browsers
   // from mixing a newly edited demo with stale cached dependencies.
-  const revision = '20260814-3';
+  const revision = '20260814-20';
   const loaders = [
     async () => {
       const module = await import(`./viz/robot2r.js?v=${revision}`);

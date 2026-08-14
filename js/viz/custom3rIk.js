@@ -4,40 +4,174 @@ import { createZUpWorld, resizeRendererToContainer } from './threeUtils.js';
 import { parseStlGeometry } from './frameDHPlayground.js?v=20260814-3';
 
 const DEG = Math.PI / 180;
-const TARGET_Q = [30 * DEG, -45 * DEG, 60 * DEG];
-const ALT_Q = [61.13874521415761 * DEG, -34.101298839110584 * DEG, -19.4501394127546 * DEG];
-const TARGET_P = new THREE.Vector3(1.12243744, 3.59141523, 3.12132034);
-const AXES = [
-  new THREE.Vector3(0, 0, 1),
-  new THREE.Vector3(0, 1, 0),
-  new THREE.Vector3(0, 0, 1)
+const MODEL_ROOT = new URL('../../assets/models/custom_3R/', import.meta.url);
+const ASSET_REVISION = new URL(import.meta.url).searchParams.get('v') || 'dev';
+const modelAssetUrl = (filename) => {
+  const url = new URL(filename, MODEL_ROOT);
+  url.searchParams.set('v', ASSET_REVISION);
+  return url;
+};
+const URDF_URL = modelAssetUrl('custom_3R_new.urdf');
+const TARGET_Q_DEG = [-35, -10, -170];
+const IK_SOLUTION_DEG = [
+  [-35, -10, -170],
+  [-14.6556883192, -6.6055592987, -147.6075456696],
+  [178.4024280182, -147.5329051962, -61.1502417161],
+  [-69.0983199015, -61.9762166618, 166.6779007736]
 ];
-const AXIS_POINTS = [
-  new THREE.Vector3(0, 0, .5),
-  new THREE.Vector3(1, 0, 1),
-  new THREE.Vector3(3, 1.25, 1)
-];
-const HOME_TOOL = new THREE.Vector3(4.5, 1.25, 1.25);
-const HOME_LINKS = [
-  new THREE.Matrix4(),
-  new THREE.Matrix4().makeTranslation(0, 0, .5),
-  new THREE.Matrix4().makeTranslation(1, 0, 1),
-  new THREE.Matrix4().makeTranslation(3, 1.25, 1)
-];
-const VISUAL_ORIGINS = [
-  new THREE.Matrix4(),
-  new THREE.Matrix4(),
-  rpyMatrix(0, .25, 0, 0, 0, -1.5707),
-  new THREE.Matrix4().makeTranslation(0, 0, .25)
-];
-const MESH_SPECS = [
-  { file: 'base_link.stl', prefix: 0, color: 0x333638 },
-  { file: 'link_1.stl', prefix: 1, color: 0x0d7d80 },
-  { file: 'link_2.stl', prefix: 2, color: 0xb8b8b8 },
-  { file: 'link_3.stl', prefix: 3, color: 0x0d7d80 }
-];
+const IKS_VISIBILITY = [true, false, false, false];
+
+let robotModelPromise;
+let robotModel;
+let ikExample;
 
 let geometryPromise;
+const variantGeometryPromises = new Map();
+
+async function loadRobotModel() {
+  if (!robotModelPromise) robotModelPromise = loadRobotModelFromUrdf();
+  return robotModelPromise;
+}
+
+async function loadRobotModelFromUrdf() {
+  const response = await fetch(URDF_URL);
+  if (!response.ok) throw new Error('Could not load custom_3R_new.urdf.');
+  const documentNode = new DOMParser().parseFromString(await response.text(), 'application/xml');
+  if (documentNode.querySelector('parsererror')) throw new Error('custom_3R_new.urdf is not valid XML.');
+
+  const directChild = (element, tagName) => [...element.children]
+    .find((child) => child.tagName.toLowerCase() === tagName);
+  const vectorAttribute = (element, attribute, fallback = [0, 0, 0]) =>
+    (element?.getAttribute(attribute)?.trim().split(/\s+/).map(Number) || fallback);
+  const originMatrix = (element) => {
+    const origin = directChild(element, 'origin');
+    const [x, y, z] = vectorAttribute(origin, 'xyz');
+    const [roll, pitch, yaw] = vectorAttribute(origin, 'rpy');
+    return rpyMatrix(x, y, z, roll, pitch, yaw);
+  };
+  const joint = (name) => {
+    const element = [...documentNode.querySelectorAll('joint')].find((item) => item.getAttribute('name') === name);
+    if (!element) throw new Error(`Missing ${name} in custom_3R_new.urdf.`);
+    return {
+      element,
+      origin: originMatrix(element),
+      axis: new THREE.Vector3(...vectorAttribute(directChild(element, 'axis'), 'xyz', [0, 0, 1])).normalize(),
+      child: directChild(element, 'child')?.getAttribute('link')
+    };
+  };
+  const visual = (linkName) => {
+    const link = [...documentNode.querySelectorAll('link')].find((item) => item.getAttribute('name') === linkName);
+    const visualElement = link && directChild(link, 'visual');
+    const mesh = visualElement?.querySelector('geometry > mesh');
+    if (!link || !visualElement || !mesh) throw new Error(`Missing visual mesh for ${linkName}.`);
+    const filename = mesh.getAttribute('filename').split('/').at(-1);
+    return { origin: originMatrix(visualElement), file: filename };
+  };
+
+  const joints = [joint('joint_1'), joint('joint_2'), joint('joint_3')];
+  const toolJoint = joint('tool0_fixed_joint');
+  const homeLinks = [new THREE.Matrix4()];
+  joints.forEach((item, index) => {
+    homeLinks.push((index ? homeLinks[index] : new THREE.Matrix4()).clone().multiply(item.origin));
+  });
+  const axisPoints = joints.map((item, index) => new THREE.Vector3().setFromMatrixPosition(homeLinks[index + 1]));
+  const axes = joints.map((item, index) => item.axis.clone().transformDirection(homeLinks[index + 1]));
+  const toolHomeMatrix = homeLinks[3].clone().multiply(toolJoint.origin);
+  const homeTool = new THREE.Vector3().setFromMatrixPosition(toolHomeMatrix);
+  const linkNames = ['base_link', joints[0].child, joints[1].child, joints[2].child];
+  const visuals = linkNames.map(visual);
+  const colors = [0x333638, 0x0d7d80, 0xb8b8b8, 0x0d7d80];
+  const meshSpecs = visuals.map((item, index) => ({ file: item.file, prefix: index, color: colors[index] }));
+
+  const joint2Origin = new THREE.Vector3().setFromMatrixPosition(joints[1].origin);
+  const joint3Origin = new THREE.Vector3().setFromMatrixPosition(joints[2].origin);
+  const toolOrigin = new THREE.Vector3().setFromMatrixPosition(toolJoint.origin);
+  const model = {
+    axes,
+    axisPoints,
+    homeTool,
+    homeLinks,
+    visualOrigins: visuals.map((item) => item.origin),
+    meshSpecs,
+    dh: {
+      a1: joint2Origin.x,
+      alpha1: -90 * DEG,
+      d1: axisPoints[1].z,
+      a2: joint3Origin.x,
+      alpha2: 90 * DEG,
+      d2: joint3Origin.y,
+      a3: toolOrigin.x,
+      alpha3: 0,
+      d3: toolOrigin.z
+    }
+  };
+
+  const targetQ = TARGET_Q_DEG.map((angle) => angle * DEG);
+  const solutions = IK_SOLUTION_DEG.map((q) => q.map((angle) => angle * DEG));
+  const eePosition = forwardPosition(model, targetQ);
+  const derived = deriveExampleValues(model, targetQ, eePosition);
+  solutions.forEach((q, index) => {
+    const residual = forwardPosition(model, q).distanceTo(eePosition);
+    if (residual > 1e-8) throw new Error(`IK branch ${index + 1} is inconsistent with custom_3R_new.urdf.`);
+  });
+  robotModel = model;
+  ikExample = { targetQ, solutions, eePosition, ...derived };
+  bindLectureExample(ikExample, model);
+  return model;
+}
+
+function forwardPosition(model, q) {
+  return model.homeTool.clone().applyMatrix4(prefixMatrixFor(model, q, 3));
+}
+
+function prefixMatrixFor(model, q, count) {
+  const matrix = new THREE.Matrix4();
+  for (let i = 0; i < count; i += 1) matrix.multiply(expRevolute(model.axes[i], model.axisPoints[i], q[i]));
+  return matrix;
+}
+
+function deriveExampleValues(model, q, eePosition) {
+  const { a1, a2, a3, d1, d2, d3 } = model.dh;
+  const [, theta2, theta3] = q;
+  const ux = a2 + a3 * Math.cos(theta3);
+  const uy = -d3;
+  const uz = d2 + a3 * Math.sin(theta3);
+  const U = Math.cos(theta2) * ux - Math.sin(theta2) * uy;
+  const V = Math.sin(theta2) * ux + Math.cos(theta2) * uy;
+  const zBar = eePosition.z - d1;
+  const zElim = zBar / Math.sin(model.dh.alpha1);
+  const R = eePosition.x ** 2 + eePosition.y ** 2;
+  const normR = R + zBar ** 2;
+  const uNormSquared = ux ** 2 + uy ** 2 + uz ** 2;
+  const D = R + zBar ** 2 - a1 ** 2 - uNormSquared;
+  const vx = a1 + U;
+  return {
+    ux, uy, uz, U, V, zBar, zElim, R, normR, uNormSquared, D, vx,
+    planarNormSquared: ux ** 2 + uy ** 2,
+    angleUV: Math.atan2(V, U) / DEG,
+    angleU: Math.atan2(uy, ux) / DEG,
+    targetAzimuth: Math.atan2(eePosition.y, eePosition.x) / DEG,
+    preAzimuth: Math.atan2(uz, vx) / DEG
+  };
+}
+
+function bindLectureExample(example, model) {
+  window.custom3RExample = { model, ...example };
+  document.querySelectorAll('[data-custom3r-ee]').forEach((element) => {
+    const digits = Number(element.dataset.digits || 4);
+    element.textContent = example.eePosition.toArray().map((value) => value.toFixed(digits)).join(', ');
+  });
+  const [x, y, z] = example.eePosition.toArray().map((value) => fixed(value, 4));
+  const [q1, q2, q3] = TARGET_Q_DEG;
+  const bindings = {
+    problem: `\\[\\mathbf q=(${q1}^\\circ,${q2}^\\circ,${q3}^\\circ)\\Rightarrow\\mathbf p_d=\\begin{bmatrix}${x}\\\\${y}\\\\${z}\\end{bmatrix}\\mathrm m\\]`,
+    forward: `\\[\\mathbf p(${q1}^\\circ,${q2}^\\circ,${q3}^\\circ)=\\begin{bmatrix}${x}\\\\${y}\\\\${z}\\end{bmatrix}\\mathrm m\\]`,
+    inline: `\\(\\mathbf p_d=(${x},${y},${z})\\,\\mathrm m\\)`
+  };
+  const boundElements = [...document.querySelectorAll('[data-custom3r-target]')];
+  boundElements.forEach((element) => { element.innerHTML = bindings[element.dataset.custom3rTarget] || ''; });
+  if (boundElements.length && window.MathJax?.typesetPromise) window.MathJax.typesetPromise(boundElements);
+}
 
 export function initCustom3RIkDemos() {
   const hosts = [...document.querySelectorAll('[data-custom3r-ik]')];
@@ -127,12 +261,15 @@ function createDemo(container) {
   };
 
   addGrid(world);
+  if (mode !== 'dimensions') addLabelVisibilityControl(kit);
   Promise.resolve(buildMode(kit)).then((modeUpdate) => {
     if (!alive) return;
     if (typeof modeUpdate === 'function') update = modeUpdate;
+    kit.syncLabels?.();
   }).catch((error) => {
     note.textContent = 'Three.js scene could not load: ' + error.message;
     note.classList.add('is-error');
+    container.dataset.errorStack = error.stack || error.message;
     console.error('custom_3R IK visualization failed:', error);
   });
 
@@ -172,10 +309,13 @@ async function buildMode(kit) {
     case 'dh-motion': return buildDhMotion(kit);
     case 'top': return buildTopView(kit);
     case 'u-vector': return buildUVector(kit);
+    case 'uv-concept': return buildUvConcept(kit);
     case 'uv': return buildUvRotation(kit);
     case 'height': return buildHeightInvariant(kit);
     case 'radial': return buildRadialInvariant(kit);
     case 'roots': return buildRoots(kit);
+    case 'conic': return buildConicInterpretation(kit);
+    case 'conic-explorer': return buildConicExplorer(kit);
     case 'back2': return buildBackprop(kit, 2);
     case 'back1': return buildBackprop(kit, 1);
     case 'degeneracy': return buildDegeneracy(kit);
@@ -192,27 +332,33 @@ async function buildMode(kit) {
 async function buildDimensions(kit) {
   kit.setCamera([9, 6.7, 8]);
   const robot = await createRobot(kit.world, [0, 0, 0]);
+  const { dh, axisPoints, homeTool } = robotModel;
   addJointAxes(kit.world, [0, 0, 0], true);
+  const joint2 = axisPoints[1], joint3 = axisPoints[2];
+  const d2End = joint2.clone().add(new THREE.Vector3(0, dh.d2, 0));
+  const d3End = joint3.clone().add(new THREE.Vector3(0, 0, dh.d3));
   const dims = [
-    [[0, 0, 0], [0, 0, 1], 'd₁ = 0.5 + 0.5 = 1.0 m', 0xff0000],
-    [[0, 0, 1], [1, 0, 1], 'a₁ = 1.0 m', 0x111111],
-    [[1, 0, 1], [1, 1.25, 1], 'd₂ = 1.25 m', 0x3f6ea8],
-    [[1, 1.25, 1], [3, 1.25, 1], 'a₂ = 2.0 m', 0x111111],
-    [[3, 1.25, 1.25], [4.5, 1.25, 1.25], 'a₃ = 1.5 m', 0xff0000]
+    [v([0, 0, 0]), v([0, 0, dh.d1]), `d₁ = ${fixed(dh.d1, 2)} m`, 0xff0000],
+    [v([0, 0, dh.d1]), joint2, `a₁ = ${fixed(dh.a1, 2)} m`, 0x111111],
+    [joint2, d2End, `d₂ = ${fixed(dh.d2, 2)} m`, 0x3f6ea8],
+    [d2End, joint3, `a₂ = ${fixed(dh.a2, 2)} m`, 0x111111],
+    [d3End, homeTool, `a₃ = ${fixed(dh.a3, 2)} m`, 0xff0000]
   ];
-  dims.forEach(([a, b, text, color]) => addDimension(kit.world, v(a), v(b), text, color));
-  addDimension(kit.world, v([3, 1.25, 1]), v([3, 1.25, 1.25]), 'd₃ = 0.25 m', 0x888888, .75);
-  kit.note.textContent = 'custom_3R home geometry · drag to orbit · dimensions connect consecutive D–H axes';
+  const annotations = dims.map(([a, b, text, color]) =>
+    addDimension(kit.world, a, b, text, color));
+  annotations.push(addDimension(kit.world, joint3, d3End, `d₃ = ${fixed(dh.d3, 2)} m`, 0x888888, .75));
+  addDimensionLabelControls(kit, annotations);
+  kit.note.textContent = 'Geometry loaded from custom_3R_new.urdf; each annotation is derived from its joint and tool origins.';
   return () => robot.update([0, 0, 0]);
 }
 
 async function buildDhMotion(kit) {
   kit.setCamera([7, 5.4, 6.2]);
   const robot = await createRobot(kit.world, [0, 0, 0]);
-  const target = TARGET_Q.slice();
+  const target = ikExample.targetQ.slice();
   const q = [0, 0, 0];
-  addTarget(kit.world, TARGET_P, 'p_d');
-  kit.note.textContent = 'custom_3R · D–H forward motion to q = (30°, −45°, 60°)';
+  addTarget(kit.world, ikExample.eePosition, 'p_d');
+  kit.note.textContent = `The global target p_d = (${vectorText(ikExample.eePosition, 3)}) m is computed once from the URDF and q = (${TARGET_Q_DEG.join('°, ')}°).`;
   return (time, dt) => {
     const phase = .5 - .5 * Math.cos(Math.min(1, (time % 8) / 3) * Math.PI);
     q.forEach((_, i) => { q[i] += (target[i] * phase - q[i]) * Math.min(1, 5 * dt); });
@@ -221,108 +367,298 @@ async function buildDhMotion(kit) {
 }
 
 async function buildTopView(kit) {
-  kit.setCamera([2.1, 14, -.8], [2.1, 1.1, -.8]);
+  await loadRobotModel();
+  kit.setCamera([5.8, 7.2, 5.4], [1.1, .7, 0]);
   kit.controls.enableRotate = true;
-  const robot = await createRobot(kit.world, TARGET_Q);
-  addTarget(kit.world, TARGET_P, 'p_d');
-  addRing(kit.world, new THREE.Vector3(0, 0, 1), 3.762735, 0x3f6ea8, 1.3);
-  addDimension(kit.world, v([0, 0, 1]), v([0, 0, 3.12132034]), 'z̄ = zₑ − d₁ = 2.1213 m', 0xff0000);
-  addDimension(kit.world, v([0, 0, 0]), v([0, 0, 1]), 'subtract d₁ = 1.0 m', 0x111111);
-  kit.note.textContent = 'top view is the default · R = x² + y² = 14.1581 m² · drag to tilt';
-  return () => robot.update(TARGET_Q);
+  const robot = await createRobot(kit.world, ikExample.targetQ);
+  addRobotVisibilityToggle(kit, robot.group, 'STL');
+  const { eePosition, R } = ikExample;
+  const d1 = robotModel.dh.d1;
+  addTarget(kit.world, eePosition, 'p_d');
+  const projection = new THREE.Vector3(eePosition.x, eePosition.y, d1);
+  addRing(kit.world, new THREE.Vector3(0, 0, d1), Math.sqrt(R), 0x3f6ea8, 1.3);
+  kit.world.add(tube(projection, eePosition, .018, 0x777777, .65));
+  const projectedMarker = sphere(.09, 0x3f6ea8);
+  projectedMarker.position.copy(projection);
+  kit.world.add(projectedMarker);
+  addLabel(kit.world, projection.clone().add(new THREE.Vector3(.08, .08, .16)), 'π_xy(p_d)');
+  kit.note.textContent = `The blue circle has radius ρ = ${fixed(Math.sqrt(R), 4)} m; combining ρ² with z̄² gives the θ₁-invariant R used in the paper.`;
+  return () => robot.update(ikExample.targetQ);
 }
 
 async function buildUVector(kit) {
+  await loadRobotModel();
   kit.setCamera([7.3, 5.2, 5.8]);
-  const robot = await createRobot(kit.world, TARGET_Q);
-  const origin = new THREE.Vector3(1, 0, 1);
+  const homeQ = [0, 0, 0];
+  const theta3OnlyQ = [0, 0, ikExample.targetQ[2]];
+  const homeRobot = await createRobot(kit.world, homeQ, {
+    opacity: .25,
+    colors: [0x777777, 0x777777, 0x999999, 0x777777]
+  });
+  const finalRobot = await createRobot(kit.world, ikExample.targetQ, {
+    opacity: .25,
+    colors: [0x333638, 0x3f6ea8, 0xaec7e8, 0x3f6ea8]
+  });
+  const theta3Robot = await createRobot(kit.world, theta3OnlyQ, { opacity: .8 });
+  addRobotVisibilityToggle(kit, homeRobot.group, 'Home');
+  addRobotVisibilityToggle(kit, finalRobot.group, 'Final');
+  addRobotVisibilityToggle(kit, theta3Robot.group, 'θ₃');
+  const origin = robotModel.axisPoints[1].clone();
+  const { a2, a3, d2, d3 } = robotModel.dh;
+  const theta = ikExample.targetQ[2];
+  const thetaDegrees = TARGET_Q_DEG[2];
   // Frame 1 has x₁ = x_W, y₁ = -z_W, z₁ = y_W at q₁ = 0.
-  const u = new THREE.Vector3(2.75, 2.549038, .25);
-  addVector(kit.world, origin, u, 0xff0000, 'u(60°) = [2.750, −0.250, 2.549]ᵀ');
+  const u = new THREE.Vector3(a2 + a3 * Math.cos(theta), d2 + a3 * Math.sin(theta), d3);
+  addVector(kit.world, origin, u, 0xff0000, `u(${thetaDegrees}°)`);
+  addVector(kit.world, origin, new THREE.Vector3(a2 + a3, d2, d3), 0x777777, 'u(0°)');
+  addTarget(kit.world, ikExample.eePosition, 'p_d', new THREE.Vector3(-.28, .08, .58));
   addVector(kit.world, origin, new THREE.Vector3(.65, 0, 0), 0xe74c3c, 'x₁');
   addVector(kit.world, origin, new THREE.Vector3(0, 0, -.65), 0x35a853, 'y₁');
   addVector(kit.world, origin, new THREE.Vector3(0, .65, 0), 0x2775ff, 'z₁');
-  kit.note.textContent = 'u is expressed before the θ₂ rotation · q₃ slider is frozen at 60°';
-  return () => robot.update(TARGET_Q);
+  kit.note.textContent = `The θ₃-only state (${thetaDegrees}°) is shown at 0.8 opacity; home and the final IK state are references at 0.25.`;
+  return () => {
+    homeRobot.update(homeQ);
+    finalRobot.update(ikExample.targetQ);
+    theta3Robot.update(theta3OnlyQ);
+  };
 }
 
 async function buildUvRotation(kit) {
+  await loadRobotModel();
   kit.setCamera([6.8, 5.8, 6.5]);
-  const robot = await createRobot(kit.world, TARGET_Q);
-  const center = new THREE.Vector3(1, 0, 1);
-  addRingInPlane(kit.world, center, 2.76134, new THREE.Vector3(0, 1, 0), 0x3f6ea8);
-  addVector(kit.world, center, new THREE.Vector3(2.75, 0, .25), 0x777777, '[uₓ,uᵧ]');
-  addVector(kit.world, center, new THREE.Vector3(1.767767, 0, 2.12132), 0xff0000, '[U,V]');
-  kit.note.textContent = 'θ₂ rotates one planar vector into the other · both lengths = 2.7613 m';
-  return () => robot.update(TARGET_Q);
+  const robot = await createRobot(kit.world, ikExample.targetQ);
+  const center = robotModel.axisPoints[1].clone();
+  addRingInPlane(kit.world, center, Math.sqrt(ikExample.planarNormSquared), new THREE.Vector3(0, 1, 0), 0x3f6ea8);
+  addVector(kit.world, center, new THREE.Vector3(ikExample.ux, 0, -ikExample.uy), 0x777777, '[F₁,−F₂]');
+  addVector(kit.world, center, new THREE.Vector3(ikExample.U, 0, -ikExample.V), 0xff0000, '[E,zₑ]');
+  kit.note.textContent = `θ₂ = ${fixed(TARGET_Q_DEG[1], 0)}° rotates [F₁,−F₂] into [E,zₑ]; both lengths remain ${fixed(Math.sqrt(ikExample.planarNormSquared), 4)} m.`;
+  return () => robot.update(ikExample.targetQ);
+}
+
+async function buildUvConcept(kit) {
+  await loadRobotModel();
+  kit.setCamera([6.8, 5.8, 6.5]);
+  const stlGroup = new THREE.Group();
+  kit.world.add(stlGroup);
+  const homeRobot = await createRobot(kit.world, [0, 0, 0], {
+    opacity: .25,
+    colors: [0x777777, 0x777777, 0x999999, 0x777777]
+  });
+  const rotatedQ = [0, ikExample.targetQ[1], ikExample.targetQ[2]];
+  const rotatedRobot = await createRobot(kit.world, rotatedQ, { opacity: .72 });
+  stlGroup.add(homeRobot.group, rotatedRobot.group);
+  addRobotVisibilityToggle(kit, stlGroup, 'STL');
+  addRobotVisibilityToggle(kit, homeRobot.group, 'Home');
+
+  const center = robotModel.axisPoints[1].clone();
+  const jointAxis = robotModel.axes[1].clone();
+  kit.world.add(makeAxis(center, jointAxis, 4.2, 0x111111));
+  addLabel(kit.world, center.clone().addScaledVector(jointAxis, 1.55), 'joint 2 axis');
+  addRingInPlane(kit.world, center, Math.sqrt(ikExample.planarNormSquared), jointAxis, 0x3f6ea8);
+  addVector(kit.world, center, new THREE.Vector3(ikExample.ux, 0, -ikExample.uy), 0x777777, '[F₁,−F₂]');
+  addVector(kit.world, center, new THREE.Vector3(ikExample.U, 0, -ikExample.V), 0xff0000, '[E,zₑ]');
+  kit.note.textContent = `Viewed in the home joint-2 frame, θ₂ = ${TARGET_Q_DEG[1]}° is the oriented rotation from [F₁,−F₂] to [E,zₑ].`;
+  return () => {
+    homeRobot.update([0, 0, 0]);
+    rotatedRobot.update(rotatedQ);
+  };
 }
 
 async function buildHeightInvariant(kit) {
+  await loadRobotModel();
   kit.setCamera([7.1, 4.7, 6.2]);
-  const robot = await createRobot(kit.world, TARGET_Q);
-  addTarget(kit.world, TARGET_P, 'z_e = 3.1213');
-  addDimension(kit.world, v([0, 0, 1]), v([0, 0, 3.12132034]), 'z̄ = 2.1213 m', 0xff0000);
+  const robot = await createRobot(kit.world, ikExample.targetQ);
+  const d1 = robotModel.dh.d1;
+  addTarget(kit.world, ikExample.eePosition, `z_tool = ${fixed(ikExample.eePosition.z, 4)}`);
+  addDimension(kit.world, v([0, 0, d1]), v([0, 0, ikExample.eePosition.z]), `z̄ = ${fixed(ikExample.zBar, 4)} m`, 0xff0000);
   const plane = new THREE.GridHelper(8, 16, 0xaaaaaa, 0xdddddd);
   plane.rotation.x = Math.PI / 2;
-  plane.position.z = 1;
+  plane.position.z = d1;
   kit.world.add(plane);
   kit.note.textContent = 'subtracting d₁ moves the reference plane from world z = 0 to D–H z = 0';
-  return () => robot.update(TARGET_Q);
+  return () => robot.update(ikExample.targetQ);
 }
 
 async function buildRadialInvariant(kit) {
-  kit.setCamera([2.1, 14, -.8], [2.1, 1.1, -.8]);
-  const robot = await createRobot(kit.world, TARGET_Q);
-  addTarget(kit.world, TARGET_P, 'p_d');
-  addRing(kit.world, new THREE.Vector3(0, 0, 3.12132034), Math.sqrt(14.15812917), 0xff0000, 1.5);
-  addVector(kit.world, new THREE.Vector3(0, 0, 3.12132034), new THREE.Vector3(TARGET_P.x, TARGET_P.y, 0), 0x3f6ea8, '√R = 3.7627 m');
-  kit.note.textContent = 'θ₁ changes azimuth only · the red radial circle is invariant';
-  return () => robot.update(TARGET_Q);
+  await loadRobotModel();
+  kit.setCamera([4.2, 10.8, 6.4], [.8, .45, 1.15]);
+  const robot = await createRobot(kit.world, ikExample.targetQ);
+  const center = new THREE.Vector3(0, 0, ikExample.eePosition.z);
+  const joint1Point = robotModel.axisPoints[0];
+  addTarget(kit.world, ikExample.eePosition, 'p_d');
+  addRing(kit.world, center, Math.sqrt(ikExample.R), 0xff0000, 1.5);
+  addVector(kit.world, center, new THREE.Vector3(ikExample.eePosition.x, ikExample.eePosition.y, 0), 0x3f6ea8, 'ρ');
+  kit.world.add(tube(joint1Point.clone().add(new THREE.Vector3(0, 0, -1)), center.clone().add(new THREE.Vector3(0, 0, 1)), .025, 0x111111, .8));
+  addLabel(kit.world, joint1Point.clone().add(new THREE.Vector3(.08, .08, .15)), 'joint 1');
+  addLabel(kit.world, center.clone().add(new THREE.Vector3(.08, .08, .15)), '(0,0,z_e)');
+  kit.note.textContent = 'The black joint-1 axis is x = y = 0. The circle radius is ρ; the algebraic invariant is R = ρ² + z̄².';
+  return () => robot.update(ikExample.targetQ);
 }
 
 async function buildRoots(kit) {
   kit.setCamera([7.2, 5.4, 6.6]);
-  const a = await createRobot(kit.world, TARGET_Q, { opacity: .8, colors: [0x333638, 0x0d7d80, 0xb8b8b8, 0x0d7d80] });
-  const b = await createRobot(kit.world, ALT_Q, { opacity: .42, colors: [0x333638, 0xff5555, 0xffbbbb, 0xff5555] });
-  addTarget(kit.world, TARGET_P, 'same p_d');
-  kit.note.textContent = 'two real quartic roots · teal (30°, −45°, 60°) · red (61.139°, −34.101°, −19.450°)';
-  return (time) => {
-    a.group.visible = Math.sin(time * .8) > -.8;
-    b.group.visible = Math.sin(time * .8) < .8;
-  };
+  const palettes = [
+    [0x333638, 0x0d7d80, 0xb8b8b8, 0x0d7d80],
+    [0x333638, 0x3f6ea8, 0xaec7e8, 0x3f6ea8],
+    [0x333638, 0xd79b00, 0xf0d48b, 0xd79b00],
+    [0x333638, 0xff5555, 0xffbbbb, 0xff5555]
+  ];
+  await loadRobotModel();
+  const robots = await Promise.all(ikExample.solutions.map((q, i) =>
+    createRobot(kit.world, q, { opacity: .58, colors: palettes[i] })));
+  robots.forEach((robot, i) => {
+    const elbow = robotModel.axisPoints[2].clone().applyMatrix4(prefixMatrixFor(robotModel, ikExample.solutions[i], 2));
+    addLabel(robot.group, elbow.add(new THREE.Vector3(.08, .08, .24)), `IKS ${i + 1}`, palettes[i][1]);
+    addRobotVisibilityToggle(
+      kit,
+      robot.group,
+      `IKS ${i + 1}`,
+      IKS_VISIBILITY[i],
+      (visible) => { IKS_VISIBILITY[i] = visible; }
+    );
+  });
+  addTarget(kit.world, ikExample.eePosition, 'same p_d');
+  kit.note.textContent = 'Each switch independently preserves an IK branch, so any subset of the four solutions can be compared at the common target.';
+  return () => robots.forEach((robot, i) => robot.update(ikExample.solutions[i]));
 }
 
 async function buildBackprop(kit, joint) {
+  await loadRobotModel();
   kit.setCamera(joint === 2 ? [6.8, 5.5, 6.3] : [2.1, 14, -.8], [2.1, 1.1, -.8]);
-  const robot = await createRobot(kit.world, TARGET_Q);
-  addTarget(kit.world, TARGET_P, 'p_d');
+  const robot = await createRobot(kit.world, ikExample.targetQ);
+  addTarget(kit.world, ikExample.eePosition, 'p_d');
   if (joint === 2) {
-    addVector(kit.world, v([1, 0, 1]), v([2.75, 0, .25]), 0x777777, 'atan2(u_y,u_x) = −5.194°');
-    addVector(kit.world, v([1, 0, 1]), v([1.767767, 0, 2.12132]), 0xff0000, 'atan2(V,U) = −50.194°');
-    kit.note.textContent = 'θ₂ = −50.194° − (−5.194°) = −45.000°';
+    const center = robotModel.axisPoints[1];
+    addVector(kit.world, center, v([ikExample.ux, 0, -ikExample.uy]), 0x777777, `atan2(−F₂,F₁) = ${fixed(ikExample.angleU, 3)}°`);
+    addVector(kit.world, center, v([ikExample.U, 0, -ikExample.V]), 0xff0000, `atan2(zₑ,E) = ${fixed(ikExample.angleUV, 3)}°`);
+    kit.note.textContent = `θ₂ = atan2(zₑ,E) − atan2(−F₂,F₁) = ${fixed(TARGET_Q_DEG[1], 3)}°.`;
   } else {
-    addVector(kit.world, v([0, 0, 1]), v([2.767767, 2.549038, 0]), 0x777777, 'pre-rotation azimuth = 42.644°');
-    addVector(kit.world, v([0, 0, 1]), v([TARGET_P.x, TARGET_P.y, 0]), 0xff0000, 'target azimuth = 72.644°');
-    kit.note.textContent = 'θ₁ = 72.644° − 42.644° = 30.000°';
+    const center = v([0, 0, robotModel.dh.d1]);
+    addVector(kit.world, center, v([ikExample.vx, ikExample.uz, 0]), 0x777777, `atan2(C,a₁+E) = ${fixed(ikExample.preAzimuth, 3)}°`);
+    addVector(kit.world, center, v([ikExample.eePosition.x, ikExample.eePosition.y, 0]), 0xff0000, `target azimuth = ${fixed(ikExample.targetAzimuth, 3)}°`);
+    kit.note.textContent = `θ₁ = ${fixed(ikExample.targetAzimuth, 3)}° − ${fixed(ikExample.preAzimuth, 3)}° = ${fixed(TARGET_Q_DEG[0], 3)}°.`;
   }
-  return () => robot.update(TARGET_Q);
+  return () => robot.update(ikExample.targetQ);
 }
 
-function buildDegeneracy(kit) {
+async function buildDegeneracy(kit) {
   kit.setCamera([6.8, 5.3, 6.2]);
-  const root = new THREE.Group();
-  kit.world.add(root);
-  const axis1 = makeAxis(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 1), 3.6, 0x111111);
-  const axis2 = makeAxis(new THREE.Vector3(1, 0, 1), new THREE.Vector3(0, 1, 0), 4.2, 0xff0000);
-  root.add(axis1, axis2);
-  const dimension = addDimension(root, v([0, 0, 1]), v([1, 0, 1]), 'a₁ → 0', 0x3f6ea8);
-  kit.note.textContent = 'animate the common-normal distance: generic custom_3R → intersecting-axis case';
+  const filenames = [
+    'custom_3R_new.urdf',
+    'custom_3R_new_800.urdf',
+    'custom_3R_new_600.urdf',
+    'custom_3R_new_400.urdf',
+    'custom_3R_new_0.urdf'
+  ];
+  const variants = await Promise.all(filenames.map((filename) => createUrdfVariantRobot(kit.world, filename)));
+  variants.forEach((variant) => setVariantOpacity(variant.group, 0));
+  let lastMessage = '';
+  const stageDuration = 2.4;
+  const fadeDuration = .55;
   return (time) => {
-    const a = .5 + .5 * Math.cos(time * .65);
-    axis2.position.x = -1 + a;
-    dimension.scale.x = Math.max(a, .001);
-    dimension.visible = a > .03;
+    const position = (time % (stageDuration * variants.length)) / stageDuration;
+    const index = Math.floor(position);
+    const withinStage = (position - index) * stageDuration;
+    const nextIndex = (index + 1) % variants.length;
+    const blend = Math.max(0, Math.min(1, (withinStage - (stageDuration - fadeDuration)) / fadeDuration));
+    variants.forEach((variant, variantIndex) => {
+      const opacity = variantIndex === index ? 1 - blend : variantIndex === nextIndex ? blend : 0;
+      setVariantOpacity(variant.group, opacity);
+    });
+    const current = variants[index];
+    const next = variants[nextIndex];
+    const message = blend > .02
+      ? `${current.filename} (a₁=${fixed(current.a1, 1)} m) → ${next.filename} (a₁=${fixed(next.a1, 1)} m)`
+      : `${current.filename} · a₁ = ${fixed(current.a1, 1)} m`;
+    if (message !== lastMessage) {
+      kit.note.textContent = message;
+      lastMessage = message;
+    }
   };
+}
+
+async function createUrdfVariantRobot(world, filename) {
+  const response = await fetch(modelAssetUrl(filename));
+  if (!response.ok) throw new Error(`Could not load ${filename}.`);
+  const documentNode = new DOMParser().parseFromString(await response.text(), 'application/xml');
+  if (documentNode.querySelector('parsererror')) throw new Error(`${filename} is not valid XML.`);
+  const child = (element, tagName) => [...element.children]
+    .find((item) => item.tagName.toLowerCase() === tagName);
+  const vector = (element, attribute, fallback = [0, 0, 0]) =>
+    (element?.getAttribute(attribute)?.trim().split(/\s+/).map(Number) || fallback);
+  const origin = (element) => {
+    const originElement = child(element, 'origin');
+    const [x, y, z] = vector(originElement, 'xyz');
+    const [roll, pitch, yaw] = vector(originElement, 'rpy');
+    return rpyMatrix(x, y, z, roll, pitch, yaw);
+  };
+  const joint = (name) => {
+    const element = [...documentNode.querySelectorAll('joint')].find((item) => item.getAttribute('name') === name);
+    if (!element) throw new Error(`Missing ${name} in ${filename}.`);
+    return { element, origin: origin(element), child: child(element, 'child')?.getAttribute('link') };
+  };
+  const visual = (name) => {
+    const link = [...documentNode.querySelectorAll('link')].find((item) => item.getAttribute('name') === name);
+    const element = link && child(link, 'visual');
+    const mesh = element?.querySelector('geometry > mesh');
+    if (!mesh) throw new Error(`Missing visual for ${name} in ${filename}.`);
+    return { origin: origin(element), file: mesh.getAttribute('filename').split('/').at(-1) };
+  };
+
+  const joints = [joint('joint_1'), joint('joint_2'), joint('joint_3')];
+  const homeLinks = [new THREE.Matrix4()];
+  joints.forEach((item, index) => {
+    homeLinks.push((index ? homeLinks[index] : new THREE.Matrix4()).clone().multiply(item.origin));
+  });
+  const linkNames = ['base_link', ...joints.map((item) => item.child)];
+  const visuals = linkNames.map(visual);
+  const colors = [0x333638, 0x0d7d80, 0xb8b8b8, 0x0d7d80];
+  const group = new THREE.Group();
+  world.add(group);
+  await Promise.all(visuals.map(async (item, index) => {
+    const geometry = await loadVariantGeometry(item.file);
+    const holder = new THREE.Group();
+    holder.matrixAutoUpdate = false;
+    holder.matrix.copy(homeLinks[index]).multiply(item.origin);
+    const material = new THREE.MeshStandardMaterial({
+      color: colors[index], roughness: .62, metalness: .06,
+      transparent: true, opacity: 1, depthWrite: false
+    });
+    holder.add(new THREE.Mesh(geometry.clone(), material));
+    group.add(holder);
+  }));
+
+  const joint2Point = new THREE.Vector3().setFromMatrixPosition(homeLinks[2]);
+  const axis1Point = new THREE.Vector3(0, 0, joint2Point.z);
+  const a1 = joint2Point.x;
+  group.add(makeAxis(axis1Point, new THREE.Vector3(0, 0, 1), 3.8, 0x111111));
+  group.add(makeAxis(joint2Point, new THREE.Vector3(0, 1, 0), 4.2, 0xff0000));
+  if (Math.abs(a1) > 1e-4) addDimension(group, axis1Point, joint2Point, `a₁ = ${fixed(a1, 1)} m`, 0x3f6ea8);
+  else addLabel(group, joint2Point.clone().add(new THREE.Vector3(.16, .12, .18)), 'a₁ = 0 · shared point', 0x3f6ea8);
+  return { group, filename, a1 };
+}
+
+function loadVariantGeometry(filename) {
+  if (!variantGeometryPromises.has(filename)) {
+    variantGeometryPromises.set(filename, fetch(modelAssetUrl(filename)).then(async (response) => {
+      if (!response.ok) throw new Error(`Could not load ${filename}.`);
+      return parseStlGeometry(await response.arrayBuffer());
+    }));
+  }
+  return variantGeometryPromises.get(filename);
+}
+
+function setVariantOpacity(group, opacity) {
+  group.visible = opacity > .005;
+  group.traverse((object) => {
+    if (!object.material) return;
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    materials.forEach((material) => {
+      material.transparent = true;
+      material.opacity = opacity;
+      material.depthWrite = false;
+    });
+  });
 }
 
 function buildOrbit(kit) {
@@ -398,26 +734,131 @@ function buildIntersecting(kit) {
 async function buildPipeline(kit) {
   kit.setCamera([7.2, 5.4, 6.6]);
   const robot = await createRobot(kit.world, [0, 0, 0]);
-  addTarget(kit.world, TARGET_P, 'p_d');
+  addTarget(kit.world, ikExample.eePosition, 'p_d');
   const q = [0, 0, 0];
-  kit.note.textContent = 'numerical solve replay · θ₃ = 60° → θ₂ = −45° → θ₁ = 30°';
+  kit.note.textContent = `One branch is reconstructed in elimination order: θ₃ = ${TARGET_Q_DEG[2]}° → θ₂ = ${TARGET_Q_DEG[1]}° → θ₁ = ${TARGET_Q_DEG[0]}°.`;
   return (time, dt) => {
     const phase = time % 9;
     const desired = [0, 0, 0];
-    if (phase > 1) desired[2] = TARGET_Q[2] * Math.min(1, phase - 1);
-    if (phase > 3.3) desired[1] = TARGET_Q[1] * Math.min(1, phase - 3.3);
-    if (phase > 5.6) desired[0] = TARGET_Q[0] * Math.min(1, phase - 5.6);
+    if (phase > 1) desired[2] = ikExample.targetQ[2] * Math.min(1, phase - 1);
+    if (phase > 3.3) desired[1] = ikExample.targetQ[1] * Math.min(1, phase - 3.3);
+    if (phase > 5.6) desired[0] = ikExample.targetQ[0] * Math.min(1, phase - 5.6);
     q.forEach((_, i) => { q[i] += (desired[i] - q[i]) * Math.min(1, 7 * dt); });
     robot.update(q);
   };
 }
 
+async function buildConicInterpretation(kit) {
+  await loadRobotModel();
+  kit.setCamera([0, 6.8, 0], [0, 0, 0]);
+  kit.controls.enableRotate = false;
+  const z = .02;
+  addRing(kit.world, new THREE.Vector3(0, 0, z), 1, 0xff0000, 2);
+  kit.world.add(tube(v([-1.55, 0, z]), v([1.55, 0, z]), .012, 0x777777));
+  kit.world.add(tube(v([0, -1.35, z]), v([0, 1.35, z]), .012, 0x777777));
+
+  const conic = custom3rConic(ikExample.normR, ikExample.zBar);
+  addImplicitContour(kit.world, conic, [-1.45, 1.45, -1.25, 1.25], 86, 0x3f6ea8, z + .015);
+  ikExample.solutions.forEach((q) => {
+    const theta = q[2];
+    const marker = sphere(.045, 0x111111);
+    marker.position.set(Math.cos(theta), Math.sin(theta), z + .05);
+    kit.world.add(marker);
+  });
+  addLabel(kit.world, v([1.25, .08, z]), 'c₃');
+  addLabel(kit.world, v([.08, 1.18, z]), 's₃');
+  kit.note.textContent = 'Blue: F(c₃,s₃)=0. Red: c₃²+s₃²=1. Their four intersections are the four real values of θ₃.';
+  return () => {};
+}
+
+async function buildConicExplorer(kit) {
+  await loadRobotModel();
+  kit.setCamera([0, 6.8, 0], [0, 0, 0]);
+  kit.controls.enableRotate = false;
+  const z = .02;
+  addRing(kit.world, new THREE.Vector3(0, 0, z), 1, 0xff0000, 2);
+  kit.world.add(tube(v([-1.55, 0, z]), v([1.55, 0, z]), .012, 0x777777));
+  kit.world.add(tube(v([0, -1.35, z]), v([0, 1.35, z]), .012, 0x777777));
+  addLabel(kit.world, v([1.25, .08, z]), 'c₃');
+  addLabel(kit.world, v([.08, 1.18, z]), 's₃');
+
+  const state = { R: ikExample.normR, z: ikExample.zBar };
+  const markers = new THREE.Group();
+  kit.world.add(markers);
+  let contour;
+  const redraw = () => {
+    if (contour) {
+      kit.world.remove(contour);
+      contour.geometry.dispose();
+      contour.material.dispose();
+    }
+    while (markers.children.length) {
+      const child = markers.children[0];
+      markers.remove(child);
+      disposeObject(child);
+    }
+    const conic = custom3rConic(state.R, state.z);
+    contour = addImplicitContour(kit.world, conic, [-1.45, 1.45, -1.25, 1.25], 86, 0x3f6ea8, z + .015);
+    const roots = circleIntersections(conic);
+    roots.forEach((theta) => {
+      const marker = sphere(.05, 0x111111);
+      marker.position.set(Math.cos(theta), Math.sin(theta), z + .05);
+      markers.add(marker);
+    });
+    kit.note.textContent = `R = ρ²+z² = ${fixed(state.R, 2)} m², z = ${fixed(state.z, 2)} m: ${roots.length} circle–conic intersection${roots.length === 1 ? '' : 's'}.`;
+  };
+  addConicSlider(kit, 'R', .2, 10, .05, state.R, (value) => { state.R = value; redraw(); });
+  addConicSlider(kit, 'z', -3, 3, .05, state.z, (value) => { state.z = value; redraw(); });
+  redraw();
+  return () => {};
+}
+
+function custom3rConic(R, z) {
+  const { a1, a2, a3, d2, d3, alpha1 } = robotModel.dh;
+  const normConstant = a2 ** 2 + a3 ** 2 + d2 ** 2 + d3 ** 2;
+  const zElim = z / Math.sin(alpha1);
+  return (c, s) => {
+    const F1 = a2 + a3 * c;
+    const F2 = d3;
+    // The circle identity reduces F3 to an affine function of (c3,s3).
+    const F3 = a1 ** 2 + normConstant + 2 * a2 * a3 * c + 2 * d2 * a3 * s;
+    const E = (R - F3) / (2 * a1);
+    return E ** 2 + zElim ** 2 - F1 ** 2 - F2 ** 2;
+  };
+}
+
+function circleIntersections(fn) {
+  const samples = 1440;
+  const roots = [];
+  let theta0 = -Math.PI;
+  let value0 = fn(Math.cos(theta0), Math.sin(theta0));
+  for (let i = 1; i <= samples; i += 1) {
+    const theta1 = -Math.PI + (2 * Math.PI * i) / samples;
+    const value1 = fn(Math.cos(theta1), Math.sin(theta1));
+    if (value0 === 0 || value0 * value1 < 0) {
+      let lo = theta0, hi = theta1, fLo = value0;
+      for (let iteration = 0; iteration < 42; iteration += 1) {
+        const mid = (lo + hi) / 2;
+        const fMid = fn(Math.cos(mid), Math.sin(mid));
+        if (fLo * fMid <= 0) hi = mid;
+        else { lo = mid; fLo = fMid; }
+      }
+      const root = (lo + hi) / 2;
+      if (!roots.some((item) => Math.abs(Math.atan2(Math.sin(root - item), Math.cos(root - item))) < 1e-4)) roots.push(root);
+    }
+    theta0 = theta1;
+    value0 = value1;
+  }
+  return roots;
+}
+
 async function createRobot(world, q = [0, 0, 0], options = {}) {
+  const model = await loadRobotModel();
   const geometries = await loadGeometries();
   const group = new THREE.Group();
   world.add(group);
   const visuals = [];
-  MESH_SPECS.forEach((spec, i) => {
+  model.meshSpecs.forEach((spec, i) => {
     const holder = new THREE.Group();
     holder.matrixAutoUpdate = false;
     const color = options.colors?.[i] ?? spec.color;
@@ -428,7 +869,7 @@ async function createRobot(world, q = [0, 0, 0], options = {}) {
     }));
     holder.add(mesh);
     group.add(holder);
-    visuals.push({ holder, prefix: spec.prefix, home: HOME_LINKS[i].clone().multiply(VISUAL_ORIGINS[i]) });
+    visuals.push({ holder, prefix: spec.prefix, home: model.homeLinks[i].clone().multiply(model.visualOrigins[i]) });
   });
   function update(values) {
     visuals.forEach((item) => {
@@ -442,20 +883,17 @@ async function createRobot(world, q = [0, 0, 0], options = {}) {
 
 function loadGeometries() {
   if (!geometryPromise) {
-    const root = new URL('../../assets/models/custom_3R/', import.meta.url);
-    geometryPromise = Promise.all(MESH_SPECS.map(async (spec) => {
-      const response = await fetch(new URL(spec.file, root));
+    geometryPromise = loadRobotModel().then((model) => Promise.all(model.meshSpecs.map(async (spec) => {
+      const response = await fetch(modelAssetUrl(spec.file));
       if (!response.ok) throw new Error('Could not load ' + spec.file);
       return parseStlGeometry(await response.arrayBuffer());
-    }));
+    })));
   }
   return geometryPromise;
 }
 
 function prefixMatrix(q, count) {
-  const matrix = new THREE.Matrix4();
-  for (let i = 0; i < count; i += 1) matrix.multiply(expRevolute(AXES[i], AXIS_POINTS[i], q[i]));
-  return matrix;
+  return prefixMatrixFor(robotModel, q, count);
 }
 
 function expRevolute(axis, point, angle) {
@@ -467,9 +905,9 @@ function expRevolute(axis, point, angle) {
 
 function addJointAxes(world, q, labels = false) {
   const axes = [
-    { p: AXIS_POINTS[0], w: AXES[0], prefix: 0, text: 'z₀ · joint 1' },
-    { p: AXIS_POINTS[1], w: AXES[1], prefix: 1, text: 'z₁ · joint 2' },
-    { p: AXIS_POINTS[2], w: AXES[2], prefix: 2, text: 'z₂ · joint 3' }
+    { p: robotModel.axisPoints[0], w: robotModel.axes[0], prefix: 0, text: 'z₀ · joint 1' },
+    { p: robotModel.axisPoints[1], w: robotModel.axes[1], prefix: 1, text: 'z₁ · joint 2' },
+    { p: robotModel.axisPoints[2], w: robotModel.axes[2], prefix: 2, text: 'z₂ · joint 3' }
   ];
   axes.forEach((axis) => {
     const m = prefixMatrix(q, axis.prefix);
@@ -492,11 +930,11 @@ function addGrid(world) {
   world.add(grid);
 }
 
-function addTarget(world, point, text) {
+function addTarget(world, point, text, labelOffset = new THREE.Vector3(.1, .1, .32)) {
   const marker = sphere(.14, 0xff0000);
   marker.position.copy(point);
   world.add(marker);
-  addLabel(world, point.clone().add(new THREE.Vector3(.1, .1, .32)), text);
+  addLabel(world, point.clone().add(labelOffset), text);
 }
 
 function addDimension(world, start, end, text, color = 0x111111, opacity = 1) {
@@ -510,9 +948,148 @@ function addDimension(world, start, end, text, color = 0x111111, opacity = 1) {
   group.add(tube(start, end, .018, color, opacity));
   group.add(tube(start.clone().sub(cap), start.clone().add(cap), .014, color, opacity));
   group.add(tube(end.clone().sub(cap), end.clone().add(cap), .014, color, opacity));
-  addLabel(group, start.clone().lerp(end, .5).add(cap.clone().multiplyScalar(1.3)), text, color);
+  group.userData.dimensionLabel = addLabel(
+    group,
+    start.clone().lerp(end, .5).add(cap.clone().multiplyScalar(1.3)),
+    text,
+    color
+  );
+  group.userData.dimensionKey = text.slice(0, 2);
   world.add(group);
   return group;
+}
+
+function addDimensionLabelControls(kit, dimensions) {
+  const choices = [
+    ['all', 'All'],
+    ['none', 'None'],
+    ...dimensions.map((group) => [group.userData.dimensionKey, group.userData.dimensionKey])
+  ];
+  const label = document.createElement('span');
+  label.className = 'ik3r-control-label';
+  label.textContent = 'Labels';
+  const select = document.createElement('select');
+  select.className = 'ik3r-label-select';
+  select.setAttribute('aria-label', 'Visible dimension labels');
+  choices.forEach(([value, text]) => {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = text;
+    select.appendChild(option);
+  });
+  const update = () => {
+    setAllLabelsVisible(kit.world, select.value === 'all');
+    if (select.value !== 'all' && select.value !== 'none') {
+      const selected = dimensions.find((group) => group.userData.dimensionKey === select.value);
+      if (selected?.userData.dimensionLabel) selected.userData.dimensionLabel.visible = true;
+    }
+  };
+  select.addEventListener('change', update);
+  kit.cleaners.push(() => select.removeEventListener('change', update));
+  kit.controlHost.append(label, select);
+  kit.syncLabels = update;
+}
+
+function addLabelVisibilityControl(kit) {
+  const label = document.createElement('label');
+  label.className = 'ik3r-label-toggle';
+  const checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+  checkbox.checked = true;
+  checkbox.setAttribute('aria-label', 'Show scene labels');
+  const text = document.createElement('span');
+  text.textContent = 'Labels';
+  label.append(checkbox, text);
+  const update = () => setAllLabelsVisible(kit.world, checkbox.checked);
+  checkbox.addEventListener('change', update);
+  kit.cleaners.push(() => checkbox.removeEventListener('change', update));
+  kit.controlHost.append(label);
+  kit.syncLabels = update;
+}
+
+function addRobotVisibilityToggle(kit, robotGroup, text, checked = true, onChange = () => {}) {
+  const label = document.createElement('label');
+  label.className = 'ik3r-state-toggle';
+  const checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+  checkbox.checked = checked;
+  checkbox.setAttribute('aria-label', `Show ${text} robot state`);
+  const track = document.createElement('span');
+  track.className = 'ik3r-switch-track';
+  track.setAttribute('aria-hidden', 'true');
+  const caption = document.createElement('span');
+  caption.textContent = text;
+  const update = () => {
+    robotGroup.visible = checkbox.checked;
+    onChange(checkbox.checked);
+  };
+  checkbox.addEventListener('change', update);
+  kit.cleaners.push(() => checkbox.removeEventListener('change', update));
+  label.append(checkbox, track, caption);
+  kit.controlHost.append(label);
+  update();
+}
+
+function addConicSlider(kit, text, min, max, step, initial, onInput) {
+  const label = document.createElement('label');
+  label.className = 'ik3r-slider-control';
+  const caption = document.createElement('span');
+  const valueLabel = document.createElement('output');
+  const input = document.createElement('input');
+  input.type = 'range';
+  input.min = min;
+  input.max = max;
+  input.step = step;
+  input.value = initial;
+  const update = () => {
+    const value = Number(input.value);
+    valueLabel.value = fixed(value, 2);
+    onInput(value);
+  };
+  caption.textContent = text;
+  valueLabel.value = fixed(initial, 2);
+  input.setAttribute('aria-label', text);
+  input.addEventListener('input', update);
+  kit.cleaners.push(() => input.removeEventListener('input', update));
+  label.append(caption, input, valueLabel);
+  kit.controlHost.append(label);
+}
+
+function setAllLabelsVisible(world, visible) {
+  world.traverse((object) => {
+    if (object.userData.isIkLabel) object.visible = visible;
+  });
+}
+
+function addImplicitContour(world, fn, bounds, resolution, color, z = 0) {
+  const [xMin, xMax, yMin, yMax] = bounds;
+  const dx = (xMax - xMin) / resolution;
+  const dy = (yMax - yMin) / resolution;
+  const points = [];
+  const interpolate = (a, b, fa, fb) => a.clone().lerp(b, Math.abs(fa - fb) < 1e-12 ? .5 : fa / (fa - fb));
+  for (let ix = 0; ix < resolution; ix += 1) {
+    for (let iy = 0; iy < resolution; iy += 1) {
+      const corners = [
+        v([xMin + ix * dx, yMin + iy * dy, z]),
+        v([xMin + (ix + 1) * dx, yMin + iy * dy, z]),
+        v([xMin + (ix + 1) * dx, yMin + (iy + 1) * dy, z]),
+        v([xMin + ix * dx, yMin + (iy + 1) * dy, z])
+      ];
+      const values = corners.map((p) => fn(p.x, p.y));
+      const crossings = [];
+      [[0, 1], [1, 2], [2, 3], [3, 0]].forEach(([a, b]) => {
+        if ((values[a] <= 0 && values[b] > 0) || (values[a] > 0 && values[b] <= 0)) {
+          crossings.push(interpolate(corners[a], corners[b], values[a], values[b]));
+        }
+      });
+      if (crossings.length === 2) points.push(crossings[0], crossings[1]);
+      if (crossings.length === 4) points.push(crossings[0], crossings[1], crossings[2], crossings[3]);
+    }
+  }
+  const geometry = new THREE.BufferGeometry().setFromPoints(points);
+  const lines = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color }));
+  world.add(lines);
+  return lines;
 }
 
 function addVector(world, origin, vector, color, text) {
@@ -587,6 +1164,7 @@ function addLabel(parent, position, text, color = 0x111111) {
   sprite.position.copy(position);
   sprite.scale.set(canvas.width / 115, canvas.height / 115, 1);
   sprite.renderOrder = 20;
+  sprite.userData.isIkLabel = true;
   parent.add(sprite);
   return sprite;
 }
@@ -598,6 +1176,11 @@ function rpyMatrix(x, y, z, roll, pitch, yaw) {
 }
 
 function v(values) { return new THREE.Vector3(...values); }
+function fixed(value, digits = 4) {
+  const clean = Math.abs(value) < .5 * 10 ** -digits ? 0 : value;
+  return Number(clean).toFixed(digits);
+}
+function vectorText(vector, digits = 4) { return vector.toArray().map((value) => fixed(value, digits)).join(', '); }
 
 function disposeObject(object) {
   object.geometry?.dispose?.();

@@ -38,7 +38,7 @@
 
     <section class="slide">
       <p class="slide-kicker">Running example · Meet the robot</p>
-      <h2 class="slide-title">Every derivation will return to this custom_3R</h2>
+      <h2 class="slide-title">Kinematic geometry of the custom 3R robot</h2>
       <p class="slide-subtitle">The lines connect consecutive D–H axes. Their signed lengths are the geometry used by both forward and inverse kinematics.</p>
       <div class="ik3r-application is-wide">
         <div data-custom3r-ik data-mode="dimensions"></div>
@@ -49,7 +49,7 @@
             <div><strong>\(a_1\)</strong>\(1.00\) m</div>
             <div><strong>\(d_2\)</strong>\(1.25\) m</div>
             <div><strong>\(a_2\)</strong>\(2.00\) m</div>
-            <div><strong>\(d_3\)</strong>\(0.25\) m</div>
+            <div><strong>\(d_3\)</strong>\(0.75\) m</div>
             <div><strong>\(a_3\)</strong>\(1.50\) m</div>
           </div>
           <p class="small-text">The old \(T_z(1.0)\) base offset is absorbed into row 1 because it commutes with \(R_z(\theta_1)\).</p>
@@ -59,7 +59,7 @@
 
     <section class="slide">
       <p class="slide-kicker">The narrative</p>
-      <h2 class="slide-title">Two methods expose two kinds of structure</h2>
+      <h2 class="slide-title">Algebraic and geometric structure in 3R inverse kinematics</h2>
       <p class="slide-subtitle">Both methods enumerate branches analytically; they differ in what they exploit.</p>
       <div class="method-path">
         <article class="method-card">
@@ -73,15 +73,28 @@
         </article>
       </div>
       <div class="ik-takeaway"><strong>Learning goal:</strong> recognize when elimination is generic—and when robot geometry gives a shorter route.</div>
+      <p class="source-note">Sources:</p>
+      <p class="source-note"> D. L. Pieper, <em>The Kinematics of Manipulators under Computer Control</em>, PhD thesis, Stanford University, 1968;</p>
+      <p class="source-note">W. Kahan, <em>Lectures on Computational Aspects of Geometry</em>, UC Berkeley, 1983. </p>
+      <p class="source-note">B. E. Paden, <em>Kinematics and Control of Robot Manipulators</em>, PhD thesis, UC Berkeley, 1986; </p>
+      <p class="source-note">R. Murray, Z. Li, and S. Sastry, <em> A Mathematical Introduction to Robotic Manipulation</em>. Boca Raton, FL: CRC Press, 1994. </p>
+
     </section>
 
     <section class="slide">
       <p class="slide-kicker">Problem setup</p>
-      <h2 class="slide-title">A 3R positioning chain asks for three angles</h2>
+      <h2 class="slide-title">The 3R position inverse-kinematics problem</h2>
       <p class="slide-subtitle">Given a reachable end-effector position \(\mathbf p_d=[x\;y\;z_e]^T\), find every \(\boldsymbol\theta=[\theta_1\;\theta_2\;\theta_3]^T\) that produces it.</p>
       <div class="layout-40-60">
         <div>
           <div class="equation">\[\mathbf p(\theta_1,\theta_2,\theta_3)=\mathbf p_d\]</div>
+          <div class="equation compact boxed-result" data-custom3r-target="problem">
+            \[
+            \mathbf q=(-35^\circ,-10^\circ,-170^\circ)
+            \Rightarrow
+            \mathbf p_d=\begin{bmatrix}1.7018\\0.0164\\1.8294\end{bmatrix}\mathrm m
+            \]
+          </div>
           <div class="condition-list">
             <div><strong>Input</strong><span>D–H geometry and \(\mathbf p_d\)</span></div>
             <div><strong>Output</strong><span>all real joint triples within limits</span></div>
@@ -94,7 +107,7 @@
 
     <section class="slide">
       <p class="slide-kicker">Algebraic method · D–H model</p>
-      <h2 class="slide-title">Start from one explicit kinematic convention</h2>
+      <h2 class="slide-title">Standard D–H convention for the 3R chain</h2>
       <p class="slide-subtitle">We use standard D–H transforms. This fixes the meaning of every parameter in the derivation.</p>
       <div class="equation compact">\[{}^{i-1}T_i=R_z(\theta_i)T_z(d_i)T_x(a_i)R_x(\alpha_i)\]</div>
       <table class="dh-table" aria-label="Generic standard Denavit Hartenberg table">
@@ -110,8 +123,8 @@
 
     <section class="slide">
       <p class="slide-kicker">Apply it · custom_3R D–H model</p>
-      <h2 class="slide-title">The inferred table reproduces the bundled URDF exactly</h2>
-      <p class="slide-subtitle">We place \(F_0\) at the world origin and absorb the full vertical offset into \(d_1\).</p>
+      <h2 class="slide-title">D–H parameters of the custom 3R robot</h2>
+      <p class="slide-subtitle">Placing \(F_0\) at the world origin and absorbing the vertical offset into \(d_1\) reproduces the model geometry exactly.</p>
       <div class="ik3r-application">
         <div data-custom3r-ik data-mode="dimensions"></div>
         <aside class="custom3r-numeric-card accent">
@@ -120,13 +133,13 @@
             <tbody>
               <tr><td>1</td><td>1.00</td><td>−90°</td><td>1.00</td></tr>
               <tr><td>2</td><td>2.00</td><td>+90°</td><td>1.25</td></tr>
-              <tr><td>3</td><td>1.50</td><td>0°</td><td>0.25</td></tr>
+              <tr><td>3</td><td>1.50</td><td>0°</td><td>0.75</td></tr>
             </tbody>
           </table>
-          <div class="equation compact">
+          <div class="equation compact" data-custom3r-target="forward">
             \[
-            \mathbf p(30^\circ,-45^\circ,60^\circ)
-            =\begin{bmatrix}1.1224\\3.5914\\3.1213\end{bmatrix}\mathrm m
+            \mathbf p(-35^\circ,-10^\circ,-170^\circ)
+            =\begin{bmatrix}1.7018\\0.0164\\1.8294\end{bmatrix}\mathrm m
             \]
           </div>
           <p class="small-text">This position becomes the numerical IK target for the remainder of the algebraic method.</p>
@@ -136,8 +149,8 @@
 
     <section class="slide">
       <p class="slide-kicker">Algebraic method · Strategy</p>
-      <h2 class="slide-title">Pieper’s idea: eliminate joints in a deliberate order</h2>
-      <p class="slide-subtitle">Package the geometry first; do not expand three transforms into a page of trigonometry.</p>
+      <h2 class="slide-title">Ordered elimination of joint variables</h2>
+      <p class="slide-subtitle">A compact geometric representation exposes invariants that remove \(\theta_1\) and \(\theta_2\) before solving for \(\theta_3\).</p>
       <div class="step-grid reveal-children">
         <article class="step-card"><strong>1 · Remove \(\theta_1\)</strong><p>Translate by \(d_1\), then keep radial distance and height—quantities unchanged by rotation about \(z_0\).</p></article>
         <article class="step-card"><strong>2 · Remove \(\theta_2\)</strong><p>Represent its action as a 2D rotation and use preservation of planar length.</p></article>
@@ -148,8 +161,8 @@
 
     <section class="slide">
       <p class="slide-kicker">Algebraic method · Package joints 2 and 3</p>
-      <h2 class="slide-title">Isolate all \(\theta_3\)-dependence in one vector</h2>
-      <p class="slide-subtitle">Let \(c_i=\cos\theta_i\), \(s_i=\sin\theta_i\), \(c_{\alpha i}=\cos\alpha_i\), and \(s_{\alpha i}=\sin\alpha_i\).</p>
+      <h2 class="slide-title">A composite vector for the third-joint dependence</h2>
+      <p class="slide-subtitle">The vector \(\mathbf u(\theta_3)\) collects every occurrence of \(\theta_3\), with components that are linear in \(c_3\) and \(s_3\).</p>
       <div class="layout-two-column divided">
         <div>
           <p class="lead">Before rotation by \(\theta_2\), define</p>
@@ -179,204 +192,342 @@
 
     <section class="slide">
       <p class="slide-kicker">Apply it · custom_3R \(\mathbf u(\theta_3)\)</p>
-      <h2 class="slide-title">At \(\theta_3=60^\circ\), the packaged vector is numerical</h2>
+      <h2 class="slide-title">Geometric variation of \(\mathbf u(\theta_3)\)</h2>
+      <p class="slide-subtitle">The home vector and the global target’s \(\theta_3=-170^\circ\) vector isolate the geometric change produced before the \(\theta_2\) rotation.</p>
       <div class="ik3r-application">
         <div data-custom3r-ik data-mode="u-vector"></div>
         <aside class="custom3r-numeric-card accent">
           <div class="equation compact">
             \[
             \begin{aligned}
-            u_x&=2+1.5\cos60^\circ=2.750,\\
-            u_y&=-0.25,\\
-            u_z&=1.25+1.5\sin60^\circ=2.549.
+            u_x&=2+1.5\cos(-170^\circ)=0.5228,\\
+            u_y&=-0.75,\\
+            u_z&=1.25+1.5\sin(-170^\circ)=0.9895.
             \end{aligned}
             \]
           </div>
-          <p>The vector is drawn in the pre-\(\theta_2\) frame. The STL robot shows where the same geometry sits physically.</p>
+          <div class="equation micro">
+            \[\mathbf u(0^\circ)=[3.500\;-0.750\;1.250]^T\]
+          </div>
+          <p>Both vectors are drawn in the pre-\(\theta_2\) frame. The final reference reaches <span data-custom3r-target="inline">\(\mathbf p_d=(1.7018,0.0164,1.8294)\,\mathrm m\)</span>.</p>
         </aside>
       </div>
     </section>
 
     <section class="slide">
       <p class="slide-kicker">Algebraic method · Eliminate \(\theta_1\)</p>
-      <h2 class="slide-title">Subtract \(d_1\), then keep radius and height</h2>
-      <p class="slide-subtitle">Translation by \(d_1\) places the target relative to the first joint’s axial offset.</p>
+      <h2 class="slide-title">Azimuth-invariant target coordinates</h2>
+      <p class="slide-subtitle">The custom robot’s forward kinematics makes the first elimination visible: \(\theta_1\) rotates the horizontal coordinates but cannot change height or horizontal radius.</p>
       <div class="layout-two-column divided">
         <div>
-          <div class="equation">\[\bar z=z_e-d_1,\qquad R=x^2+y^2\]</div>
-          <p>With \(\bar{\mathbf p}=[x\;y\;\bar z]^T\),</p>
-          <div class="equation compact">
+          <p>Substituting the D–H values from <code>custom_3R_new.urdf</code>, define</p>
+          <div class="equation micro">
             \[
-            \bar{\mathbf p}=R_z(\theta_1)
-            \left(
-            \begin{bmatrix}a_1\\0\\0\end{bmatrix}
-            +R_x(\alpha_1)R_z(\theta_2)\mathbf u
-            \right).
+            F_1=2+1.5c_3,\qquad F_2=0.75,\qquad C=1.25+1.5s_3,
+            \]
+            \[
+            \begin{aligned}
+            x&=c_1(1+F_1c_2+F_2s_2)-s_1C,\\
+            y&=s_1(1+F_1c_2+F_2s_2)+c_1C,\\
+            z&:=z_e-d_1=F_2c_2-F_1s_2.
+            \end{aligned}
             \]
           </div>
+          <div class="equation micro boxed-result">
+            \[
+            \rho^2:=x^2+y^2,
+            \qquad R:=\rho^2+z^2=\|[x\;y\;z]^T\|^2,
+            \]
+            \[
+            \frac{\partial R}{\partial\theta_1}=0,
+            \qquad \frac{\partial z}{\partial\theta_1}=0,
+            \qquad \frac{\partial\rho^2}{\partial\theta_1}=0.
+            \]
+          </div>
+          <p class="small-text">Notation follows Salunkhe et al., <em>Mechanism and Machine Theory</em> 171 (2022), Sec. 2.1; the paper’s \(z\) is measured after removing \(d_1\).</p>
         </div>
         <div data-custom3r-ik data-mode="top"></div>
       </div>
-      <div class="ik-takeaway">A rotation \(R_z(\theta_1)\) changes azimuth, but cannot change \(R\) or \(\bar z\). Therefore \(\theta_1\) is gone.</div>
+      <div class="ik-takeaway">The norm \(R=\rho^2+z^2\), the shifted height \(z\), and \(\rho^2=x^2+y^2\) are independent of \(\theta_1\).</div>
     </section>
 
     <section class="slide">
-      <p class="slide-kicker">Algebraic method · Expose \(\theta_2\)</p>
-      <h2 class="slide-title">Name the two coordinates rotated by \(\theta_2\)</h2>
-      <p class="slide-subtitle">The pair \((U,V)\) is simply \((u_x,u_y)\) rotated through \(\theta_2\).</p>
-      <div class="layout-two-column divided">
-        <div>
-          <div class="equation">
+      <p class="slide-kicker">Algebraic method · Coefficient form</p>
+      <h2 class="slide-title">The invariant equations are linear in \(c_2,s_2\)</h2>
+      <p class="slide-subtitle">The paper packages every \(\theta_3\)-dependent term into \(F_i(\theta_3)\), leaving two equations with explicit second-joint coefficients.</p>
+      <div class="ik3r-application">
+        <div data-custom3r-ik data-mode="uv-concept"></div>
+        <aside class="custom3r-numeric-card">
+          <div class="equation micro">
             \[
-            \begin{bmatrix}U\\V\end{bmatrix}
-            =
-            \begin{bmatrix}c_2&-s_2\\s_2&c_2\end{bmatrix}
-            \begin{bmatrix}u_x\\u_y\end{bmatrix}
+            \begin{aligned}
+            R&=2a_1(F_1c_2+F_2s_2)+F_3,\\
+            z&=(F_1s_2-F_2c_2)\sin\alpha_1.
+            \end{aligned}
             \]
           </div>
-          <div class="ik-callout">Invariant: \(U^2+V^2=u_x^2+u_y^2\).</div>
-        </div>
-        <div>
-          <p>After the twist \(\alpha_1\), the coordinates before \(R_z(\theta_1)\) are</p>
-          <div class="equation compact boxed-result">
+          <p>For the custom robot, \(a_1=1\), \(\sin\alpha_1=-1\), and</p>
+          <div class="equation micro boxed-result">
             \[
-            v_x=a_1+U,\quad
-            v_y=c_{\alpha1}V-s_{\alpha1}u_z,\quad
-            \bar z=s_{\alpha1}V+c_{\alpha1}u_z.
+            \begin{aligned}
+            F_1&=2+1.5c_3,\\
+            F_2&=0.75,\\
+            F_3&=9.375+6c_3+3.75s_3
+            \end{aligned}
+            \]
+            \[
+            \boxed{\begin{aligned}
+            R&=2(F_1c_2+F_2s_2)+F_3,\\
+            z&=-(F_1s_2-F_2c_2).
+            \end{aligned}}
             \]
           </div>
-        </div>
+          <div class="ik-callout">The two coefficient rows \([F_1\;F_2]\) and \([-F_2\;F_1]\) are orthogonal.</div>
+        </aside>
       </div>
     </section>
 
     <section class="slide">
-      <p class="slide-kicker">Apply it · custom_3R planar rotation</p>
-      <h2 class="slide-title">\(\theta_2=-45^\circ\) rotates \((u_x,u_y)\) into \((U,V)\)</h2>
+      <p class="slide-kicker">Algebraic method · Radial and height equations</p>
+      <h2 class="slide-title">Two coefficient equations determine \(\theta_2\)</h2>
+      <p class="slide-subtitle">Rearranging the two invariant equations isolates two orthogonal linear combinations of \(c_2,s_2\).</p>
       <div class="ik3r-application">
         <div data-custom3r-ik data-mode="uv"></div>
         <aside class="custom3r-numeric-card">
-          <div class="equation compact">
+          <div class="equation micro">
             \[
-            \begin{bmatrix}U\\V\end{bmatrix}
-            =R(-45^\circ)
-            \begin{bmatrix}2.750\\-0.250\end{bmatrix}
-            =
-            \begin{bmatrix}1.7678\\-2.1213\end{bmatrix}
+            \boxed{\begin{aligned}
+            F_1c_2+F_2s_2&=E,\\
+            F_1s_2-F_2c_2&=z_e,
+            \end{aligned}}
+            \]
+            \[
+            \begin{aligned}
+            E&:=\frac{R-F_3}{2a_1},\\
+            z_m&:=\frac{z}{\sin\alpha_1}.
+            \end{aligned}
             \]
           </div>
-          <div class="equation compact">
+          <p>For the global target and \(\theta_3=-170^\circ\),</p>
+          <div class="equation micro boxed-result">
             \[
-            U^2+V^2=u_x^2+u_y^2=7.625.
+            \begin{aligned}
+            R&=\rho^2+z^2=3.584193,\\
+            z&=0.829387,\\
+            F_1&=0.522788,\\
+            F_2&=0.750000,\\
+            F_3&=2.814973,\\
+            E&=(R-F_3)/2=0.384610,\\
+            z_m&=z/\sin\alpha_1=-0.829387.
+            \end{aligned}
             \]
           </div>
-        </aside>
-      </div>
-    </section>
-
-    <section class="slide">
-      <p class="slide-kicker">Algebraic method · Recover \(V\)</p>
-      <h2 class="slide-title">The height equation gives one rotated coordinate</h2>
-      <p class="slide-subtitle">For the generic case \(s_{\alpha1}\neq0\), solve the \(\bar z\)-equation directly.</p>
-      <div class="layout-two-column divided">
-        <div class="boxed-result">
-          <div class="equation">
-            \[
-            \boxed{V(\theta_3)=
-            \frac{\bar z-c_{\alpha1}u_z(\theta_3)}{s_{\alpha1}}}
-            \]
-          </div>
-          <p>Once \(\theta_3\) is known, \(V\) is known.</p>
-        </div>
-        <div>
-          <p>The other transverse component simplifies to</p>
-          <div class="equation">\[v_y=\frac{c_{\alpha1}\bar z-u_z}{s_{\alpha1}}.\]</div>
-          <p>Substitute \(V\) into \(v_y=c_{\alpha1}V-s_{\alpha1}u_z\).</p>
-        </div>
-      </div>
-      <div class="ik-takeaway"><strong>Genericity condition:</strong> this route divides by \(s_{\alpha1}\); parallel axes need another elimination.</div>
-    </section>
-
-    <section class="slide">
-      <p class="slide-kicker">Custom 3R · shifted height</p>
-      <h2 class="slide-title">Move the reference plane up by d₁ = 1 m</h2>
-      <div class="ik3r-application">
-        <div data-custom3r-ik data-mode="height"></div>
-        <aside class="custom3r-numeric-card accent">
-          <div class="equation compact">
-            \[
-            \bar z=3.1213-(0.5+0.5)=2.1213\ \mathrm m.
-            \]
-          </div>
-          <p>For \(\alpha_1=-90^\circ\), \(c_{\alpha1}=0\) and \(s_{\alpha1}=-1\), therefore</p>
-          <div class="equation">\[\boxed{V=-\bar z=-2.1213\ \mathrm m}\]</div>
-          <p>The 3D scene shows both the world ground and the shifted D–H reference plane.</p>
-        </aside>
-      </div>
-    </section>
-
-    <section class="slide">
-      <p class="slide-kicker">Algebraic method · Recover \(U\)</p>
-      <h2 class="slide-title">The radial equation gives the other coordinate</h2>
-      <p class="slide-subtitle">Use \(R=v_x^2+v_y^2\), then simplify before solving.</p>
-      <div class="derivation-stack reveal-children">
-        <div class="derivation-row"><span class="tag">A</span><p>\(R=(a_1+U)^2+v_y^2=a_1^2+2a_1U+U^2+v_y^2\).</p></div>
-        <div class="derivation-row"><span class="tag">B</span><p>Replace \(U^2\) by \(u_x^2+u_y^2-V^2\).</p></div>
-        <div class="derivation-row"><span class="tag">C</span><p>Use the cancellation \(V^2-v_y^2=\bar z^2-u_z^2\).</p></div>
-      </div>
-      <div class="equation boxed-result">
-        \[
-        \boxed{U(\theta_3)=\frac{D(\theta_3)}{2a_1}},
-        \qquad D=R+\bar z^2-a_1^2-\|\mathbf u(\theta_3)\|^2
-        \]
-      </div>
-      <div class="ik-takeaway"><strong>Genericity condition:</strong> this step divides by \(a_1\). The case \(a_1=0\) motivates our geometric method.</div>
-    </section>
-
-    <section class="slide">
-      <p class="slide-kicker">Apply it · custom_3R radial equation</p>
-      <h2 class="slide-title">The top view makes \(R=x^2+y^2\) tangible</h2>
-      <div class="ik3r-application">
-        <div data-custom3r-ik data-mode="radial"></div>
-        <aside class="custom3r-numeric-card">
-          <div class="equation compact">
-            \[
-            R=1.1224^2+3.5914^2=14.1581\ \mathrm m^2.
-            \]
-          </div>
-          <div class="equation compact">
-            \[
-            D=R+\bar z^2-a_1^2-\|\mathbf u\|^2=3.5355,
-            \qquad U=\frac{D}{2a_1}=1.7678.
-            \]
-          </div>
-          <p>The camera starts exactly above the robot. Drag to recover the spatial interpretation.</p>
+          <p class="small-text">Hence \(0.522788c_2+0.75s_2=0.384610\) and \(0.522788s_2-0.75c_2=-0.829387\).</p>
         </aside>
       </div>
     </section>
 
     <section class="slide">
       <p class="slide-kicker">Algebraic method · Eliminate \(\theta_2\)</p>
-      <h2 class="slide-title">Rotation preserves length—so \(\theta_2\) disappears</h2>
-      <p class="slide-subtitle">Both \(U\) and \(V\) are now functions of \(\theta_3\) and known data. Enforce the identity they must satisfy.</p>
-      <div class="equation compact boxed-result">
+      <h2 class="slide-title">Squaring and adding removes the second joint</h2>
+      <p class="slide-subtitle">The coefficient rows are orthogonal, so the squared sum cancels the cross terms and uses only \(c_2^2+s_2^2=1\).</p>
+      <div class="derivation-stack">
+        <div class="derivation-row"><span class="tag">1</span><p>Square \(F_1c_2+F_2s_2=E\).</p></div>
+        <div class="derivation-row"><span class="tag">2</span><p>Define \(z_m=z/\sin\alpha_1\), then square \(F_1s_2-F_2c_2=z_m\).</p></div>
+        <div class="derivation-row"><span class="tag">3</span><p>Add: the \(2F_1F_2c_2s_2\) terms cancel.</p></div>
+      </div>
+      <div class="equation boxed-result">
+        \[
+        \begin{aligned}
+        E^2+z_m^2
+        &=(F_1^2+F_2^2)(c_2^2+s_2^2)\\
+        &=F_1^2+F_2^2,
+        \end{aligned}
+        \]
         \[
         \boxed{
-        F(\theta_3):=
-        \frac{D(\theta_3)^2}{4a_1^2}
-        +\left(\frac{\bar z-c_{\alpha1}u_z(\theta_3)}{s_{\alpha1}}\right)^2
-        -u_x(\theta_3)^2-u_y(\theta_3)^2=0}
+        z_m=\frac{z}{\sin\alpha_1},
+        \qquad E^2+z_m^2=F_1^2+F_2^2.}
+        \]
+      </div>
+      <div class="ik-takeaway">This is the paper’s elimination step: \(F_i=F_i(\theta_3)\), so the closure contains only \(\theta_3\).</div>
+    </section>
+
+    <section class="slide">
+      <p class="slide-kicker">Custom 3R · Numerical closure</p>
+      <h2 class="slide-title">A scalar equation for the third joint</h2>
+      <p class="slide-subtitle">Substituting the target invariant \(R\), shifted height \(z\), and the custom robot’s \(F_i\) leaves a scalar constraint in \(c_3,s_3\)</p>
+      <div class="ik3r-application">
+        <div data-custom3r-ik data-mode="height"></div>
+        <aside class="custom3r-numeric-card accent">
+          <div class="equation micro">
+            \[
+            \begin{aligned}
+            z&=1.8294-(0.5+0.5)=0.8294\ \mathrm m,\\
+            z_m&=z/\sin(-90^\circ)=-0.8294\ \mathrm m,\\
+            R&=\rho^2+z^2=3.584193\ \mathrm m^2.
+            \end{aligned}
+            \]
+          </div>
+          <div class="equation micro boxed-result">
+            \[
+            \boxed{\begin{aligned}
+            &\left[\frac{3.584193-(9.375+6c_3+3.75s_3)}{2}\right]^2\\
+            &\qquad{}+0.829387^2=(2+1.5c_3)^2+0.75^2.
+            \end{aligned}}
+            \]
+          </div>
+          <p>The 3D scene identifies the shifted height \(z\); no radial sign or auxiliary square root is introduced.</p>
+        </aside>
+      </div>
+    </section>
+
+    <section class="slide">
+      <p class="slide-kicker">Algebraic method · Back-substitute \(\theta_2\)</p>
+      <h2 class="slide-title">Recovering the second joint from the coefficient equations</h2>
+      <p class="slide-subtitle">Once a real \(\theta_3\) is known, the same two coefficient equations recover \(c_2,s_2\) without another nonlinear solve.</p>
+      <div class="equation compact">
+        \[
+        \begin{bmatrix}F_1&F_2\\-F_2&F_1\end{bmatrix}^{T}
+        \begin{bmatrix}F_1&F_2\\-F_2&F_1\end{bmatrix}
+        =(F_1^2+F_2^2)I,
+        \]
+        \[
+        \boxed{\begin{aligned}
+        c_2&=\frac{F_1E-F_2z_m}{F_1^2+F_2^2},\\
+        s_2&=\frac{F_2E+F_1z_m}{F_1^2+F_2^2},\\
+        \theta_2&=\operatorname{atan2}(s_2,c_2).
+        \end{aligned}}
         \]
       </div>
       <div class="symbol-grid">
-        <div class="symbol-card"><strong>No \(\theta_1\)</strong><p>removed by radial and height invariants</p></div>
-        <div class="symbol-card"><strong>No \(\theta_2\)</strong><p>removed by \(U^2+V^2=u_x^2+u_y^2\)</p></div>
+        <div class="symbol-card"><strong>Closure</strong><p>tests whether \(E^2+z_m^2=F_1^2+F_2^2\)</p></div>
+        <div class="symbol-card"><strong>Recovery</strong><p>applies the scaled transpose of the coefficient matrix</p></div>
       </div>
-      <div class="ik-takeaway">This scalar closure equation contains only \(\theta_3\).</div>
+    </section>
+
+    <section class="slide">
+      <p class="slide-kicker">Apply it · custom_3R radial equation</p>
+      <h2 class="slide-title">Radial distance in the target plane</h2>
+      <p class="slide-subtitle">The circle shows \(\rho^2=x^2+y^2\); the paper combines it with shifted height to form \(R=\rho^2+z^2\).</p>
+      <div class="ik3r-application">
+        <div data-custom3r-ik data-mode="radial"></div>
+        <aside class="custom3r-numeric-card radial-numeric-card">
+          <div class="equation compact">
+            \[
+            \begin{aligned}
+            \rho^2 &= 1.7018^2+0.0164^2
+                      =2.896310\ \mathrm m^2,\\
+            R &= \rho^2+z^2
+                =3.584193\ \mathrm m^2.
+            \end{aligned}
+            \]
+          </div>
+          <div class="equation micro">
+            \[
+            \begin{aligned}
+            F_3&=9.375+6c_3+3.75s_3=2.814973,\\
+            E&=\frac{R-F_3}{2a_1}=0.384610.
+            \end{aligned}
+            \]
+          </div>
+          <p>The oblique view exposes the joint-1 axis passing through the circle center. Rotate toward a top view to recover the planar invariant.</p>
+        </aside>
+      </div>
+    </section>
+
+    <section class="slide">
+      <p class="slide-kicker">Algebraic method · Conic closure</p>
+      <h2 class="slide-title">The squared-sum equation is a conic</h2>
+      <p class="slide-subtitle">Using \(c_3^2+s_3^2=1\), each \(F_i(\theta_3)\) is constant or affine in \(c_3,s_3\); the closure is therefore quadratic.</p>
+      <div class="equation compact">
+        \[
+        E(c_3,s_3)=\frac{R-F_3(c_3,s_3)}{2a_1},
+        \qquad z_m=\frac{z}{\sin\alpha_1},
+        \]
+        \[
+        F(c_3,s_3)=E^2+z_m^2-F_1^2-F_2^2.
+        \]
+      </div>
+      <div class="equation compact boxed-result">
+        \[
+        \boxed{A_{xx}c_3^2+2A_{xy}c_3s_3+A_{yy}s_3^2+2B_xc_3+2B_ys_3+C_0=0.}
+        \]
+      </div>
+      <div class="symbol-grid">
+        <div class="symbol-card"><strong>Paper’s construction</strong><p>\(R,z\) enter only through the conic coefficients</p></div>
+        <div class="symbol-card"><strong>Circle identity</strong><p>\(c_3^2+s_3^2=1\) supplies the second equation</p></div>
+      </div>
+      <div class="ik-takeaway">The algebra now contains only \(c_3,s_3\); intersecting this conic with the unit circle gives every real \(\theta_3\).</div>
+    </section>
+
+    <section class="slide">
+      <p class="slide-kicker">Algebraic method · Geometric interpretation</p>
+      <h2 class="slide-title">A conic–circle formulation for \(\theta_3\)</h2>
+      <p class="slide-subtitle">Substituting the custom robot’s \(F_i\), target invariant \(R\), and shifted height \(z\) gives the numerical conic.</p>
+      <div class="ik3r-application">
+        <div data-custom3r-ik data-mode="conic"></div>
+        <aside class="custom3r-numeric-card accent">
+          <p class="lead">Substitute the custom 3R parameters</p>
+          <div class="equation micro">
+            \[
+            \begin{aligned}
+            (a_1,a_2,a_3,d_2,d_3)&=(1,2,1.5,1.25,0.75),\\
+            R &=3.584193,\\
+            z_e &=-0.829387.
+            \end{aligned}
+            \]
+          </div>
+          <div class="equation micro">
+            \[
+            E=\frac{-5.790807-6c_3-3.75s_3}{2},
+            \]
+            \[
+            E^2+(-0.829387)^2-(2+1.5c_3)^2-0.75^2=0,
+            \]
+            \[
+            \boxed{\begin{aligned}
+            6.75c_3^2+11.25c_3s_3+3.515625s_3^2\\
+            {}+11.372422c_3+10.857764s_3\\
+            {}+4.508745=0
+            \end{aligned}}
+            \]
+          </div>
+          <p>Together with \(c_3^2+s_3^2-1=0\), this conic yields four real values \(\theta_3=\operatorname{atan2}(s_3,c_3)\).</p>
+        </aside>
+      </div>
+    </section>
+
+    <section class="slide">
+      <p class="slide-kicker">Algebraic method · Interactive target invariants</p>
+      <h2 class="slide-title">Target invariants reshape the third-joint conic</h2>
+      <p class="slide-subtitle">Changing the paper’s invariants \(R=\rho^2+z^2\) and \(z\) changes the conic while the trigonometric unit circle remains fixed.</p>
+      <div class="ik3r-application">
+        <div data-custom3r-ik data-mode="conic-explorer"></div>
+        <aside class="custom3r-numeric-card accent">
+          <p class="lead">The controls update</p>
+          <div class="equation compact">
+            \[
+            \begin{aligned}
+            F_1 &= 2+1.5c_3,\\ 
+            F_2 &= 0.75, \\
+            F_3 &= 9.375+6c_3+3.75s_3, \\
+            E &= \frac{R-F_3}{2},\\
+            z_e &= \frac{z}{\sin(-90^\circ)}=-z,\\
+            F(c_3,s_3) & = E^2+z_e^2-F_1^2-F_2^2=0.
+            \end{aligned}
+            \]
+          </div>
+          <p>The red unit circle represents \(c_3^2+s_3^2=1\)</p>
+          <p>Black intersection markers are recomputed as the target invariants change.</p>
+          <div class="ik-callout">The number of intersections is the number of real third-joint candidates before back-substitution.</div>
+        </aside>
+      </div>
     </section>
 
     <section class="slide">
       <p class="slide-kicker">Algebraic method · Why degree four?</p>
-      <h2 class="slide-title">The tangent-half-angle substitution makes a quartic</h2>
+      <h2 class="slide-title">Quartic closure in tangent-half-angle coordinates</h2>
       <p class="slide-subtitle">\(\mathbf u\) is linear in \(s_3,c_3\), while \(\|\mathbf u\|^2\) also reduces to a linear expression using \(s_3^2+c_3^2=1\). Thus \(F\) is at most quadratic in \(s_3,c_3\).</p>
       <div class="quartic-flow">
         <div><strong>Trig closure</strong><div class="equation compact">\(F(s_3,c_3)=0\)</div><p>degree \(\le2\)</p></div>
@@ -390,25 +541,27 @@
 
     <section class="slide">
       <p class="slide-kicker">Apply it · custom_3R numerical quartic</p>
-      <h2 class="slide-title">The target produces two real IK branches</h2>
+      <h2 class="slide-title">Four real branches of the numerical IK problem</h2>
+      <p class="slide-subtitle">The quartic has four real roots, and back-substitution maps each root to a distinct joint configuration at the same target position.</p>
       <div class="ik3r-application">
         <div data-custom3r-ik data-mode="roots"></div>
         <aside class="custom3r-numeric-card accent">
-          <p>After dividing the polynomial coefficients by \(10^4\):</p>
+          <p>After scaling the polynomial coefficients:</p>
           <div class="equation micro">
             \[
             \begin{aligned}
-            1.701486t^4-1.515180t^3+1.261883t^2\\
-            {}-0.363180t-0.108403=0.
+            0.113677t^4+0.784472t^3-9.579991t^2\\
+            {}-44.215528t-22.631168=0.
             \end{aligned}
             \]
           </div>
           <div class="numeric-sequence">
-            <div><strong>\(t_1\)</strong>\(0.577350\Rightarrow\theta_3=60.000^\circ\)</div>
-            <div><strong>\(t_2\)</strong>\(-0.171383\Rightarrow\theta_3=-19.450^\circ\)</div>
-            <div><strong>\(t_{3,4}\)</strong>\(0.242269\pm0.764973i\)</div>
+            <div><strong>\(t_1\)</strong>\(-11.430052\Rightarrow\theta_3=-170.000^\circ\)</div>
+            <div><strong>\(t_2\)</strong>\(-3.442869\Rightarrow\theta_3=-147.608^\circ\)</div>
+            <div><strong>\(t_3\)</strong>\(-0.590812\Rightarrow\theta_3=-61.150^\circ\)</div>
+            <div><strong>\(t_4\)</strong>\(8.562827\Rightarrow\theta_3=166.678^\circ\)</div>
           </div>
-          <p class="small-text">The teal and red configurations reach the same red target point.</p>
+          <p class="small-text">Use the IKS switches to retain any subset of the four configurations at the common red target point.</p>
         </aside>
       </div>
     </section>
@@ -426,33 +579,34 @@
 
     <section class="slide">
       <p class="slide-kicker">Algebraic method · Backpropagation 1/2</p>
-      <h2 class="slide-title">Backpropagate each root to \(\theta_2\)</h2>
-      <p class="slide-subtitle">For one accepted \(\theta_3\), evaluate \(\mathbf u,D,U,V\). The two planar vectors differ only by a rotation through \(\theta_2\).</p>
+      <h2 class="slide-title">Back-substitution for \(\theta_2\)</h2>
+      <p class="slide-subtitle">For one accepted \(\theta_3\), the coefficient vector \((F_1,-F_2)\) rotates directly into the target-invariant vector \((E,z_e)\).</p>
       <div class="layout-two-column divided">
         <div>
-          <div class="equation">\[\begin{bmatrix}U\\V\end{bmatrix}=R(\theta_2)\begin{bmatrix}u_x\\u_y\end{bmatrix}\]</div>
+          <div class="equation">\[\begin{bmatrix}E\\z_e\end{bmatrix}=R(\theta_2)\begin{bmatrix}F_1\\-F_2\end{bmatrix}\]</div>
           <p>Subtract their polar angles.</p>
         </div>
         <div class="boxed-result">
-          <div class="equation">\[\boxed{\theta_2=\operatorname{atan2}(V,U)-\operatorname{atan2}(u_y,u_x)}\]</div>
+          <div class="equation compact">\[\boxed{\theta_2=\operatorname{atan2}(z_e,E)-\operatorname{atan2}(-F_2,F_1)}\]</div>
           <p>Wrap to the chosen joint interval.</p>
         </div>
       </div>
-      <div class="ik-callout">If \(u_x=u_y=0\), joint 2 is not identifiable from this position constraint.</div>
+      <div class="ik-callout">The closure guarantees the two vectors have equal length; the oriented-angle difference therefore recovers \(\theta_2\).</div>
     </section>
 
     <section class="slide">
       <p class="slide-kicker">Apply it · custom_3R backpropagation</p>
-      <h2 class="slide-title">Recover \(\theta_2\) by subtracting the two displayed angles</h2>
+      <h2 class="slide-title">Numerical recovery of \(\theta_2\)</h2>
+      <p class="slide-subtitle">The joint angle is the oriented difference between the paper’s coefficient vector \((F_1,-F_2)\) and the target-invariant vector \((E,z_e)\).</p>
       <div class="ik3r-application">
         <div data-custom3r-ik data-mode="back2"></div>
         <aside class="custom3r-numeric-card">
           <div class="equation compact">
             \[
             \begin{aligned}
-            \operatorname{atan2}(V,U)&=-50.194^\circ,\\
-            \operatorname{atan2}(u_y,u_x)&=-5.194^\circ,\\
-            \theta_2&=-45.000^\circ.
+            \operatorname{atan2}(z_e,E)&=-65.122^\circ,\\
+            \operatorname{atan2}(-F_2,F_1)&=-55.122^\circ,\\
+            \theta_2&=-10.000^\circ.
             \end{aligned}
             \]
           </div>
@@ -463,15 +617,14 @@
 
     <section class="slide">
       <p class="slide-kicker">Algebraic method · Backpropagation 2/2</p>
-      <h2 class="slide-title">Then recover \(\theta_1\) from azimuth</h2>
-      <p class="slide-subtitle">Before the first rotation, the shifted target has transverse coordinates \((v_x,v_y)\). After it, those coordinates are \((x,y)\).</p>
+      <h2 class="slide-title">Back-substitution for \(\theta_1\)</h2>
+      <p class="slide-subtitle">Before the first rotation, the horizontal vector is \((a_1+E,C)\). Joint 1 rotates it into the measured target projection \((x,y)\).</p>
       <div class="layout-two-column divided">
         <div>
-          <div class="equation compact">\[v_x=a_1+U,\qquad v_y=\frac{c_{\alpha1}\bar z-u_z}{s_{\alpha1}}\]</div>
-          <div class="equation">\[\begin{bmatrix}x\\y\end{bmatrix}=R(\theta_1)\begin{bmatrix}v_x\\v_y\end{bmatrix}\]</div>
+          <div class="equation">\[\begin{bmatrix}x\\y\end{bmatrix}=R(\theta_1)\begin{bmatrix}a_1+E\\C\end{bmatrix}\]</div>
         </div>
         <div class="boxed-result">
-          <div class="equation">\[\boxed{\theta_1=\operatorname{atan2}(y,x)-\operatorname{atan2}(v_y,v_x)}\]</div>
+          <div class="equation compact">\[\boxed{\theta_1=\operatorname{atan2}(y,x)-\operatorname{atan2}(C,a_1+E)}\]</div>
           <p>Normalize and enforce joint limits.</p>
         </div>
       </div>
@@ -480,16 +633,17 @@
 
     <section class="slide">
       <p class="slide-kicker">Apply it · custom_3R backpropagation</p>
-      <h2 class="slide-title">Recover \(\theta_1\) from the top-view azimuths</h2>
+      <h2 class="slide-title">Numerical recovery of \(\theta_1\)</h2>
+      <p class="slide-subtitle">The first-joint angle is the azimuth correction between the pre-rotation vector and the target projection.</p>
       <div class="ik3r-application">
         <div data-custom3r-ik data-mode="back1"></div>
         <aside class="custom3r-numeric-card accent">
           <div class="equation compact">
             \[
             \begin{aligned}
-            \operatorname{atan2}(y,x)&=72.644^\circ,\\
-            \operatorname{atan2}(v_y,v_x)&=42.644^\circ,\\
-            \theta_1&=30.000^\circ.
+            \operatorname{atan2}(y,x)&=0.552^\circ,\\
+            \operatorname{atan2}(C,a_1+E)&=35.552^\circ,\\
+            \theta_1&=-35.000^\circ.
             \end{aligned}
             \]
           </div>
@@ -499,61 +653,67 @@
     </section>
 
     <section class="slide">
-      <p class="slide-kicker">Algebraic method · Degeneracies</p>
-      <h2 class="slide-title">The quartic route is generic—not universal as written</h2>
-      <p class="slide-subtitle">A zero divisor signals additional geometry. It does not mean there is no IK; it means this elimination path is inappropriate.</p>
+      <p class="slide-kicker">Algebraic method · Feasibility and special structure</p>
+      <h2 class="slide-title">Feasibility tests and the intersecting-axis limit</h2>
+      <p class="slide-subtitle">The coefficient formulation identifies singular recovery cases explicitly; intersecting first and second axes require a separate geometric reduction.</p>
       <div class="degeneracy-grid">
         <article class="degeneracy-card">
           <h3>\(a_1=0\)</h3>
           <p>The common-normal distance between axes 1 and 2 vanishes: the axes intersect.</p>
-          <div class="equation compact">\[U=D/(2a_1)\quad\text{is invalid.}\]</div>
-          <p><strong>Opportunity:</strong> their intersection is fixed by both rotations, enabling a geometric decomposition.</p>
+          <div class="equation compact">\[E=\frac{R-F_3}{2a_1}\quad\text{is undefined.}\]</div>
+          <p><strong>Interpretation:</strong> the paper treats this as a special structure; the shared point enables a shorter geometric decomposition.</p>
         </article>
         <article class="degeneracy-card">
-          <h3>\(\alpha_1=0\) or \(\pi\)</h3>
-          <p>Axes 1 and 2 are parallel, so \(s_{\alpha1}=0\).</p>
-          <div class="equation compact">\[V=(\bar z-c_{\alpha1}u_z)/s_{\alpha1}\quad\text{is invalid.}\]</div>
-          <p><strong>Opportunity:</strong> parallel-axis geometry permits a different, usually lower-degree reduction.</p>
+          <h3>\(F_1^2+F_2^2=0\)</h3>
+          <p>The coefficient matrix for recovering \(c_2,s_2\) loses rank.</p>
+          <div class="equation compact">\[\det\!\begin{bmatrix}F_1&F_2\\F_2&-F_1\end{bmatrix}=-(F_1^2+F_2^2).\]</div>
+          <p><strong>Conclusion:</strong> \(\theta_2\) is not identifiable from these two invariant equations.</p>
         </article>
       </div>
     </section>
 
     <section class="slide">
-      <p class="slide-kicker">See the degeneracy · a₁ → 0</p>
-      <h2 class="slide-title">As the common normal collapses, the axes intersect</h2>
-      <p class="slide-subtitle">The animation continuously moves the custom_3R second axis toward the first. At intersection, division by \(a_1\) fails—but a shared fixed point appears.</p>
+      <p class="slide-kicker">URDF sequence · a₁ → 0</p>
+      <h2 class="slide-title">Intersecting axes in the limit \(a_1\to0\)</h2>
+      <p class="slide-subtitle">The sequence custom_3R_new → 800 → 600 → 400 → 0 renders the corresponding URDF geometry while the common-normal distance \(a_1\) contracts to zero.</p>
       <div class="ik3r-full" data-custom3r-ik data-mode="degeneracy"></div>
     </section>
 
     <section class="slide">
       <p class="slide-kicker">Algebraic method · Algorithm</p>
-      <h2 class="slide-title">The complete Pieper pipeline</h2>
+      <h2 class="slide-title">The ordered-elimination algorithm</h2>
+      <p class="slide-subtitle">The analytical procedure reduces position IK to one quartic solve, two angle recoveries, and forward-kinematics validation.</p>
       <div class="derivation-stack">
-        <div class="derivation-row"><span class="tag">1</span><p>Compute \(\bar z=z_e-d_1\), \(R=x^2+y^2\), and \(\mathbf u(\theta_3)\).</p></div>
-        <div class="derivation-row"><span class="tag">2</span><p>Build \(D\), then \(U=D/(2a_1)\) and \(V=(\bar z-c_{\alpha1}u_z)/s_{\alpha1}\).</p></div>
-        <div class="derivation-row"><span class="tag">3</span><p>Enforce \(U^2+V^2=u_x^2+u_y^2\); solve the quartic in \(t=\tan(\theta_3/2)\).</p></div>
-        <div class="derivation-row"><span class="tag">4</span><p>Back-substitute \(\theta_2,\theta_1\) with \(\operatorname{atan2}\).</p></div>
+        <div class="derivation-row"><span class="tag">1</span><p>Compute shifted \(z=z_e-d_1\), \(\rho^2=x^2+y^2\), and the paper’s invariant \(R=\rho^2+z^2\).</p></div>
+        <div class="derivation-row"><span class="tag">2</span><p>Express \(R\) and \(z\) using \(F_i(\theta_3)\), then set \(E=(R-F_3)/(2a_1)\).</p></div>
+        <div class="derivation-row"><span class="tag">3</span><p>Set \(z_e=z/\sin\alpha_1\), then enforce \(E^2+z_e^2=F_1^2+F_2^2\) and solve the conic–circle system or quartic.</p></div>
+        <div class="derivation-row"><span class="tag">4</span><p>Recover \(\theta_2\) from \((F_1,-F_2)\to(E,z_e)\), then recover \(\theta_1\) from \((a_1+E,C)\to(x,y)\).</p></div>
         <div class="derivation-row"><span class="tag">5</span><p>Apply joint limits and validate every candidate by forward kinematics.</p></div>
       </div>
     </section>
 
     <section class="slide">
       <p class="slide-kicker">Numerical replay · custom_3R</p>
-      <h2 class="slide-title">The analytical solver reconstructs the target joint by joint</h2>
+      <h2 class="slide-title">Numerical reconstruction of one IK branch</h2>
+      <p class="slide-subtitle">Back-substitution recovers \(\theta_2\) and \(\theta_1\) from a selected real root \(\theta_3\), reproducing the target to numerical precision.</p>
       <div class="ik3r-application">
         <div data-custom3r-ik data-mode="pipeline"></div>
         <aside class="custom3r-numeric-card accent">
           <div class="numeric-sequence">
-            <div><strong>target</strong>\(\mathbf p_d=(1.1224,3.5914,3.1213)\) m</div>
-            <div><strong>quartic</strong>\(\theta_3=60.000^\circ\)</div>
-            <div><strong>backprop</strong>\(\theta_2=-45.000^\circ\)</div>
-            <div><strong>azimuth</strong>\(\theta_1=30.000^\circ\)</div>
+            <div><strong>target</strong><span data-custom3r-target="inline">\(\mathbf p_d=(1.7018,0.0164,1.8294)\,\mathrm m\)</span></div>
+            <div><strong>quartic</strong>\(\theta_3=-170.000^\circ\)</div>
+            <div><strong>backprop</strong>\(\theta_2=-10.000^\circ\)</div>
+            <div><strong>azimuth</strong>\(\theta_1=-35.000^\circ\)</div>
             <div><strong>residual</strong>\(\|\mathbf p(\mathbf q)-\mathbf p_d\|&lt;10^{-12}\) m</div>
           </div>
-          <p>Second valid branch:</p>
-          <div class="equation compact">
+          <p>Three other valid branches:</p>
+          <div class="equation micro">
             \[
-            (61.1387^\circ,-34.1013^\circ,-19.4501^\circ).
+            \begin{aligned}
+            &(-14.656^\circ,-6.606^\circ,-147.608^\circ),\\
+            &(178.402^\circ,-147.533^\circ,-61.150^\circ),\\
+            &(-69.098^\circ,-61.976^\circ,166.678^\circ).
+            \end{aligned}
             \]
           </div>
         </aside>
@@ -570,7 +730,7 @@
 
     <section class="slide">
       <p class="slide-kicker">Geometric method · Circle primitive</p>
-      <h2 class="slide-title">Rotation about an axis traces a circle</h2>
+      <h2 class="slide-title">Circular orbits of revolute motion</h2>
       <p class="slide-subtitle">Let \(\boldsymbol\omega\) be a unit axis through the origin and decompose a point into axial and perpendicular parts.</p>
       <div class="layout-40-60">
         <div>
@@ -593,7 +753,7 @@
 
     <section class="slide">
       <p class="slide-kicker">Geometric method · Circle–circle distance</p>
-      <h2 class="slide-title">Before solving an angle, count the intersections</h2>
+      <h2 class="slide-title">Circle intersection and geometric feasibility</h2>
       <p class="slide-subtitle">For coplanar circles with radii \(r_1,r_2\) and center distance \(d\), feasibility is determined by three lengths.</p>
       <div class="ik3r-mini" data-custom3r-ik data-mode="circle-distance"></div>
       <div class="circle-counts">
@@ -606,7 +766,7 @@
 
     <section class="slide">
       <p class="slide-kicker">Geometric method · PK1 statement</p>
-      <h2 class="slide-title">PK1 rotates one point onto another</h2>
+      <h2 class="slide-title">Paden–Kahan subproblem 1: point registration</h2>
       <p class="slide-subtitle">Given unit axis \(\boldsymbol\omega\) and points \(\mathbf p,\mathbf q\), find \(\theta\) such that \(R(\boldsymbol\omega,\theta)\mathbf p=\mathbf q\).</p>
       <div class="layout-40-60">
         <div>
@@ -626,7 +786,7 @@
 
     <section class="slide">
       <p class="slide-kicker">Geometric method · PK1 solution</p>
-      <h2 class="slide-title">PK1 is an oriented angle in the orbit plane</h2>
+      <h2 class="slide-title">The oriented-angle solution of PK1</h2>
       <p class="slide-subtitle">Project both points perpendicular to the axis; then compute cosine and signed sine of the required angle.</p>
       <div class="layout-two-column divided">
         <div>
@@ -659,7 +819,7 @@
 
     <section class="slide">
       <p class="slide-kicker">Geometric method · PK3 statement</p>
-      <h2 class="slide-title">PK3 rotates a point to a prescribed distance</h2>
+      <h2 class="slide-title">Paden–Kahan subproblem 3: a distance constraint</h2>
       <p class="slide-subtitle">Given \(\boldsymbol\omega,\mathbf p,\mathbf q,\delta\), find every angle for which the rotated point lies on a sphere centered at \(\mathbf q\).</p>
       <div class="layout-40-60">
         <div>
@@ -672,7 +832,7 @@
 
     <section class="slide">
       <p class="slide-kicker">Geometric method · PK3 reduction</p>
-      <h2 class="slide-title">Slice the sphere by the orbit plane</h2>
+      <h2 class="slide-title">Planar reduction of the PK3 constraint</h2>
       <p class="slide-subtitle">Axial separation consumes part of the allowed distance; the remainder becomes an in-plane circle radius.</p>
       <div class="layout-two-column divided">
         <div>
@@ -702,7 +862,7 @@
 
     <section class="slide">
       <p class="slide-kicker">Geometric method · PK3 solution</p>
-      <h2 class="slide-title">The law of cosines gives the two branches</h2>
+      <h2 class="slide-title">Two PK3 branches from the law of cosines</h2>
       <p class="slide-subtitle">Let \(\gamma\) rotate \(\mathbf p_\perp\) toward the second circle’s center. Let \(\phi\) be the triangle’s remaining angle.</p>
       <div class="layout-two-column divided">
         <div>
@@ -733,7 +893,7 @@
 
     <section class="slide">
       <p class="slide-kicker">Geometric method · Connect to D–H</p>
-      <h2 class="slide-title">a₁ = 0 gives the fixed point we need</h2>
+      <h2 class="slide-title">Intersecting axes and a shared fixed point</h2>
       <p class="slide-subtitle">In standard D–H geometry, \(a_1\) is the common-normal distance between the first two joint axes. If \(a_1=0\), axes 1 and 2 intersect at \(\mathbf c\).</p>
       <div class="layout-40-60">
         <div>
@@ -752,7 +912,7 @@
 
     <section class="slide">
       <p class="slide-kicker">Geometric 3R IK · Setup</p>
-      <h2 class="slide-title">Write the required displacement as three joint motions</h2>
+      <h2 class="slide-title">Product-of-exponentials formulation of geometric IK</h2>
       <p class="slide-subtitle">Let \(g_d\) be the desired tool pose and \(g_0\) the home pose. Define \(g=g_dg_0^{-1}\).</p>
       <div class="equation">
         \[
@@ -772,7 +932,7 @@
 
     <section class="slide">
       <p class="slide-kicker">Geometric 3R IK · Step 1</p>
-      <h2 class="slide-title">Solve \(\theta_3\) with PK3</h2>
+      <h2 class="slide-title">Third-joint recovery with PK3</h2>
       <p class="slide-subtitle">Apply the displacement equation to \(\mathbf p\), subtract the common intersection \(\mathbf c\), and take norms.</p>
       <div class="derivation-stack reveal-children">
         <div class="derivation-row"><span class="tag">A</span><p>\(e^{\widehat\xi_1\theta_1}e^{\widehat\xi_2\theta_2}e^{\widehat\xi_3\theta_3}\mathbf p=g\mathbf p\).</p></div>
@@ -791,7 +951,7 @@
 
     <section class="slide">
       <p class="slide-kicker">Geometric 3R IK · Step 2</p>
-      <h2 class="slide-title">For each \(\theta_3\), isolate the first two rotations</h2>
+      <h2 class="slide-title">Residual two-joint motion after \(\theta_3\)</h2>
       <p class="slide-subtitle">Move the known third-joint motion to the right.</p>
       <div class="equation">
         \[
@@ -810,7 +970,7 @@
 
     <section class="slide">
       <p class="slide-kicker">Geometric 3R IK · Step 3</p>
-      <h2 class="slide-title">Solve \(\theta_1\) with PK1</h2>
+      <h2 class="slide-title">First-joint recovery with PK1</h2>
       <p class="slide-subtitle">Apply the two-rotation equation to \(\mathbf r\), chosen on axis 2 but not on axis 1.</p>
       <div class="layout-two-column divided">
         <div>
@@ -838,7 +998,7 @@
 
     <section class="slide">
       <p class="slide-kicker">Geometric 3R IK · Step 4</p>
-      <h2 class="slide-title">Finally solve \(\theta_2\) with PK1</h2>
+      <h2 class="slide-title">Second-joint recovery with PK1</h2>
       <p class="slide-subtitle">Remove the known first rotation and apply the result to any point \(\mathbf s\) not on axis 2.</p>
       <div class="layout-two-column divided">
         <div>
@@ -861,7 +1021,7 @@
 
     <section class="slide">
       <p class="slide-kicker">Geometric 3R IK · Branches</p>
-      <h2 class="slide-title">Carry every PK3 branch through the pipeline</h2>
+      <h2 class="slide-title">Branch propagation and candidate validation</h2>
       <p class="slide-subtitle">PK1 is single-valued modulo \(2\pi\) when nondegenerate; the principal branching occurs in PK3.</p>
       <div class="branch-tree">
         <article class="branch-node"><strong>PK3</strong><p>\(\theta_3^+,\theta_3^-\)</p><p class="small-text">two circle intersections</p></article>
@@ -882,10 +1042,11 @@
 
     <section class="slide">
       <p class="slide-kicker">Synthesis</p>
-      <h2 class="slide-title">Algebra and geometry solve the same constraint differently</h2>
+      <h2 class="slide-title">Algebraic and geometric IK: a comparison</h2>
+      <p class="slide-subtitle">Both approaches eliminate rotations through invariants, but they expose solution structure in different mathematical representations.</p>
       <div class="comparison-grid">
         <article class="comparison-card">
-          <h3>Pieper / D–H elimination</h3>
+          <h3>D–H ordered elimination</h3>
           <ul class="minimal-list">
             <li>generic \(a_1\neq0,\ s_{\alpha1}\neq0\);</li>
             <li>invariants eliminate \(\theta_1,\theta_2\);</li>
@@ -908,10 +1069,11 @@
 
     <section class="slide">
       <p class="slide-kicker">Takeaways</p>
-      <h2 class="slide-title">Four ideas to keep</h2>
+      <h2 class="slide-title">Structural principles of analytical 3R inverse kinematics</h2>
+      <p class="slide-subtitle">Radial invariance, norm preservation, angle back-substitution, and fixed-point geometry provide the main analytical tools.</p>
       <div class="derivation-stack">
-        <div class="derivation-row"><span class="tag">1</span><p>\(R=x^2+y^2\) and \(\bar z=z_e-d_1\) eliminate \(\theta_1\).</p></div>
-        <div class="derivation-row"><span class="tag">2</span><p>Planar length eliminates \(\theta_2\), leaving a quartic in \(\tan(\theta_3/2)\).</p></div>
+        <div class="derivation-row"><span class="tag">1</span><p>Shift \(z=z_e-d_1\), then use \(R=x^2+y^2+z^2\) to eliminate \(\theta_1\).</p></div>
+        <div class="derivation-row"><span class="tag">2</span><p>Write \(R\) and \(z\) as coefficient equations in \(c_2,s_2\); squaring and adding eliminates \(\theta_2\).</p></div>
         <div class="derivation-row"><span class="tag">3</span><p>Backpropagation subtracts polar angles with \(\operatorname{atan2}\).</p></div>
         <div class="derivation-row"><span class="tag">4</span><p>For \(a_1=0\), the axes’ intersection gives PK3 → PK1 → PK1.</p></div>
       </div>
@@ -920,6 +1082,6 @@
 
   </main>
   <script src="../js/deck/nav-runtime.js"></script>
-  <script type="module" src="../js/main.js?v=20260814-3"></script>
+  <script type="module" src="../js/main.js?v=20260814-20"></script>
 </body>
 </html>

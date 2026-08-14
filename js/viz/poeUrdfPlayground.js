@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { createBoldAxes, createZUpWorld, resizeRendererToContainer } from './threeUtils.js';
-import { parseStlGeometry } from './frameDHPlayground.js?v=20260814-2';
+import { parseStlGeometry } from './frameDHPlayground.js?v=20260814-3';
 
 const DEG = Math.PI / 180;
 const EPS = 1e-8;

@@ -893,8 +893,8 @@
 
     <section class="slide">
       <p class="slide-kicker">Geometric method · Connect to D–H</p>
-      <h2 class="slide-title">Intersecting axes and a shared fixed point</h2>
-      <p class="slide-subtitle">In standard D–H geometry, \(a_1\) is the common-normal distance between the first two joint axes. If \(a_1=0\), axes 1 and 2 intersect at \(\mathbf c\).</p>
+      <h2 class="slide-title">The intersecting axes of custom_3R_new_0</h2>
+      <p class="slide-subtitle">The URDF places joint 1 on the vertical line through \((0,0,0.5)\) and joint 2 on the \(y\)-directed line through \((0,0,1)\). They meet at \(\mathbf c=(0,0,1)\,\mathrm m\), so \(a_1=0\).</p>
       <div class="layout-40-60">
         <div>
           <div class="equation">
@@ -903,7 +903,7 @@
             e^{\widehat{\xi}_2\theta_2}\mathbf c=\mathbf c
             \]
           </div>
-          <p>Both rotations fix \(\mathbf c\). Distances from \(\mathbf c\) are independent of \(\theta_1,\theta_2\).</p>
+          <p>The black joint-1 axis and red joint-2 axis both pass through the blue point \(\mathbf c\). Therefore both rotations fix \(\mathbf c\).</p>
         </div>
         <div data-custom3r-ik data-mode="intersecting"></div>
       </div>
@@ -912,132 +912,224 @@
 
     <section class="slide">
       <p class="slide-kicker">Geometric 3R IK · Setup</p>
-      <h2 class="slide-title">Product-of-exponentials formulation of geometric IK</h2>
-      <p class="slide-subtitle">Let \(g_d\) be the desired tool pose and \(g_0\) the home pose. Define \(g=g_dg_0^{-1}\).</p>
-      <div class="equation">
-        \[
-        e^{\widehat\xi_1\theta_1}
-        e^{\widehat\xi_2\theta_2}
-        e^{\widehat\xi_3\theta_3}=g
-        \]
+      <h2 class="slide-title">Robot-specific POE data and position target</h2>
+      <p class="slide-subtitle">This is position IK: only \(\mathbf p_d\) is prescribed. Tool orientation is deliberately left free, allowing every position branch to survive.</p>
+      <div class="layout-two-column divided">
+        <div>
+          <div class="equation compact">
+            \[
+            \begin{aligned}
+            \boldsymbol\omega_1&=\mathbf e_z,&\mathbf q_1&=(0,0,0.5),\\
+            \boldsymbol\omega_2&=\mathbf e_y,&\mathbf q_2&=\mathbf c=(0,0,1),\\
+            \boldsymbol\omega_3&=\mathbf e_z,&\mathbf q_3&=(2,1.25,1).
+            \end{aligned}
+            \]
+          </div>
+          <div class="equation compact">\[\mathbf p=\mathbf p_{tool,0}=(3.5,1.25,1.75)\ \mathrm m\]</div>
+          <div class="condition-list">
+            <div><strong>shared point \(\mathbf c\)</strong><span>fixed by joints 1 and 2</span></div>
+            <div><strong>tool point \(\mathbf p\)</strong><span>moved first by joint 3</span></div>
+          </div>
+        </div>
+        <div>
+          <p>Numerical target used in the derivation:</p>
+          <div class="equation compact">
+            \[\mathbf p_d=\begin{bmatrix}.882624\\.589970\\1.829387\end{bmatrix}\mathrm m\]
+          </div>
+          <div class="pk-formula"><strong>Position equation</strong><div class="equation compact">
+            \[e^{\widehat\xi_1\theta_1}e^{\widehat\xi_2\theta_2}e^{\widehat\xi_3\theta_3}\mathbf p=\mathbf p_d\]
+          </div></div>
+          <p class="small-text">This target was generated from \((-35^\circ,-10^\circ,-170^\circ)\); the solve below recovers it without using those angles.</p>
+        </div>
       </div>
-      <div class="symbol-grid">
-        <div class="symbol-card"><strong>\(\mathbf c\)</strong><p>intersection of axes 1 and 2</p></div>
-        <div class="symbol-card"><strong>\(\mathbf p\)</strong><p>a convenient point not on axis 3</p></div>
-        <div class="symbol-card"><strong>\(\mathbf r\)</strong><p>on axis 2, but not on axis 1</p></div>
-        <div class="symbol-card"><strong>\(\mathbf s\)</strong><p>a point not on axis 2</p></div>
-      </div>
-      <div class="ik-callout"><strong>Reachability assumption:</strong> \(g_d\) lies on this 3-DOF chain’s pose manifold. A rotation leaves points on its own axis fixed, so strategic point choices cancel unknown exponentials.</div>
+      <div class="ik-callout"><strong>Expected multiplicity:</strong> PK3 gives two \(\theta_3\) candidates; PK2 gives two \((\theta_1,\theta_2)\) pairs for each candidate—up to four position solutions.</div>
     </section>
 
     <section class="slide">
-      <p class="slide-kicker">Geometric 3R IK · Step 1</p>
-      <h2 class="slide-title">Third-joint recovery with PK3</h2>
-      <p class="slide-subtitle">Apply the displacement equation to \(\mathbf p\), subtract the common intersection \(\mathbf c\), and take norms.</p>
-      <div class="derivation-stack reveal-children">
-        <div class="derivation-row"><span class="tag">A</span><p>\(e^{\widehat\xi_1\theta_1}e^{\widehat\xi_2\theta_2}e^{\widehat\xi_3\theta_3}\mathbf p=g\mathbf p\).</p></div>
-        <div class="derivation-row"><span class="tag">B</span><p>Subtract \(\mathbf c\). Rotations 1 and 2 fix \(\mathbf c\), so they rotate the difference vector.</p></div>
-        <div class="derivation-row"><span class="tag">C</span><p>Take norms; the first two rotations preserve length and disappear.</p></div>
+      <p class="slide-kicker">Geometric 3R IK · PK3 construction</p>
+      <h2 class="slide-title">Build the sphere and the joint-3 orbit</h2>
+      <p class="slide-subtitle">Before moving the robot, convert the target position into the two geometric objects used by PK3.</p>
+      <div class="layout-two-column divided">
+        <div>
+          <div class="derivation-row"><span class="tag">1</span><p>The desired tool position sets a sphere centered at the shared point:</p></div>
+          <div class="equation compact">\[\delta=\|\mathbf p_d-\mathbf c\|=1.3472\ \mathrm m\]</div>
+          <div class="equation micro">\[\mathcal S=\{\mathbf x:\|\mathbf x-\mathbf c\|=\delta\}\]</div>
+        </div>
+        <div>
+          <div class="derivation-row"><span class="tag">2</span><p>The home tool point is \(1.5\,\mathrm m\) from the third axis:</p></div>
+          <div class="equation compact">\[\mathbf p=(3.5,1.25,1.75),\quad \rho_3=1.5\ \mathrm m\]</div>
+          <div class="equation micro">\[\mathcal C_3=\{e^{\widehat\xi_3\theta_3}\mathbf p:\theta_3\in[-\pi,\pi]\}\]</div>
+        </div>
       </div>
-      <div class="equation boxed-result">
-        \[
-        \boxed{\|e^{\widehat\xi_3\theta_3}\mathbf p-\mathbf c\|
-        =\|g\mathbf p-\mathbf c\|=:\delta}
-        \quad\Longrightarrow\quad \text{PK3}
-        \]
+      <div class="pk-formula">
+        <strong>PK3 question</strong>
+        <div class="equation compact">\[\text{Where does }\mathcal C_3\text{ intersect }\mathcal S?\qquad \|e^{\widehat\xi_3\theta_3}\mathbf p-\mathbf c\|=\delta\]</div>
       </div>
-      <div class="ik-takeaway">The circle–sphere intersection produces zero, one, or two candidates for \(\theta_3\).</div>
+      <div class="ik-takeaway">The sphere encodes the target distance; the circle encodes every position joint 3 can give the home tool point.</div>
+    </section>
+
+    <section class="slide">
+      <p class="slide-kicker">Geometric 3R IK · Step 1 · Animated construction</p>
+      <h2 class="slide-title">Rotate \(\mathbf p\) to a circle–sphere intersection</h2>
+      <p class="slide-subtitle">The animation follows the solve order: create the sphere, reveal the robot at its home tool point \(\mathbf p\), then rotate joint 3 until \(\mathbf p\) reaches an intersection.</p>
+      <div class="layout-40-60 tight-gap">
+        <div class="derivation-stack">
+          <div class="derivation-row"><span class="tag">1</span><p><strong>Sphere:</strong> draw \(\|\mathbf x-\mathbf c\|=\delta\), where \(\delta=1.3472\,\mathrm m\).</p></div>
+          <div class="derivation-row"><span class="tag">2</span><p><strong>Start:</strong> show the robot at \(\theta_3=0\), with the tool at \(\mathbf p\).</p></div>
+          <div class="derivation-row"><span class="tag">3</span><p><strong>Rotate:</strong> move \(\mathbf p\) along \(\mathcal C_3\) until it lies on the sphere.</p></div>
+          <div class="pk-formula">
+            <strong>PK3 scalar equation</strong>
+            <div class="equation micro">\[e^{\widehat\xi_3\theta_3}\mathbf p-\mathbf c=\begin{bmatrix}2+1.5c_3\\1.25+1.5s_3\\.75\end{bmatrix}\]</div>
+            <div class="equation compact">\[\delta^2=8.375+6c_3+3.75s_3\]</div>
+            <div class="equation compact">\[\boxed{\theta_3=-170.000^\circ\ \text{or}\ -125.989^\circ}\]</div>
+          </div>
+        </div>
+        <div data-custom3r-ik data-mode="pk3-ik"></div>
+      </div>
+      <div class="ik-takeaway">At an intersection, the first two rotations can reorient the vector about \(\mathbf c\) without changing its length. This is why PK3 determines \(\theta_3\) first.</div>
     </section>
 
     <section class="slide">
       <p class="slide-kicker">Geometric 3R IK · Step 2</p>
-      <h2 class="slide-title">Residual two-joint motion after \(\theta_3\)</h2>
-      <p class="slide-subtitle">Move the known third-joint motion to the right.</p>
-      <div class="equation">
-        \[
-        h(\theta_3):=g\,e^{-\widehat\xi_3\theta_3},\qquad
-        e^{\widehat\xi_1\theta_1}e^{\widehat\xi_2\theta_2}=h.
-        \]
-      </div>
-      <div class="ik-question"><strong>Next cancellation:</strong> which point makes the second exponential disappear?</div>
-      <div class="equation compact fragment">
-        \[
-        \mathbf r\text{ on axis 2}\quad\Rightarrow\quad
-        e^{\widehat\xi_2\theta_2}\mathbf r=\mathbf r.
-        \]
-      </div>
-    </section>
-
-    <section class="slide">
-      <p class="slide-kicker">Geometric 3R IK · Step 3</p>
-      <h2 class="slide-title">First-joint recovery with PK1</h2>
-      <p class="slide-subtitle">Apply the two-rotation equation to \(\mathbf r\), chosen on axis 2 but not on axis 1.</p>
+      <h2 class="slide-title">Each \(\theta_3\) candidate leaves a PK2 problem</h2>
+      <p class="slide-subtitle">Position IK does not prescribe orientation. After selecting \(\theta_3\), solve the two remaining rotations together rather than constructing a full-pose residual transform.</p>
       <div class="layout-two-column divided">
         <div>
-          <div class="equation">
-            \[
-            e^{\widehat\xi_1\theta_1}
-            \underbrace{e^{\widehat\xi_2\theta_2}\mathbf r}_{\mathbf r}
-            =h\mathbf r
-            \]
-          </div>
-          <p>The second rotation is cancelled by the point choice.</p>
-        </div>
-        <div class="boxed-result">
-          <div class="equation">
-            \[
-            \boxed{e^{\widehat\xi_1\theta_1}\mathbf r=h\mathbf r}
-            \quad\Longrightarrow\quad \text{PK1}
-            \]
-          </div>
-          <p>Use the PK1 \(\operatorname{atan2}\) formula about axis 1.</p>
-        </div>
-      </div>
-      <div class="ik-callout">Choosing \(\mathbf r\) off axis 1 gives a nonzero orbit radius, so \(\theta_1\) is observable.</div>
-    </section>
-
-    <section class="slide">
-      <p class="slide-kicker">Geometric 3R IK · Step 4</p>
-      <h2 class="slide-title">Second-joint recovery with PK1</h2>
-      <p class="slide-subtitle">Remove the known first rotation and apply the result to any point \(\mathbf s\) not on axis 2.</p>
-      <div class="layout-two-column divided">
-        <div>
-          <div class="equation">\[e^{\widehat\xi_2\theta_2}=e^{-\widehat\xi_1\theta_1}h\]</div>
-          <p>Apply both sides to \(\mathbf s\).</p>
-        </div>
-        <div class="boxed-result">
           <div class="equation compact">
             \[
-            \boxed{e^{\widehat\xi_2\theta_2}\mathbf s
-            =e^{-\widehat\xi_1\theta_1}h\mathbf s}
-            \quad\Longrightarrow\quad \text{PK1}
+            \begin{aligned}
+            \mathbf u_0&=\mathbf p-\mathbf r_3=(1.5,0,.75),\\
+            \mathbf a&=\mathbf r_3-\mathbf c=(2,1.25,0),\\
+            \mathbf t(\theta_3)&=\mathbf a+R(\boldsymbol\omega_3,\theta_3)\mathbf u_0.
+            \end{aligned}
             \]
           </div>
-          <p>Use the same oriented-angle formula about axis 2.</p>
+        </div>
+        <div>
+          <div class="equation compact">
+            \[
+            \mathbf q:=\mathbf p_d-\mathbf c
+            =\begin{bmatrix}.882624\\.589970\\.829387\end{bmatrix}
+            \]
+          </div>
+          <div class="pk-formula"><strong>PK2</strong><div class="equation compact">
+            \[\boxed{\mathbf q=R(\boldsymbol\omega_1,\theta_1)R(\boldsymbol\omega_2,\theta_2)\mathbf t(\theta_3)}\]
+          </div></div>
         </div>
       </div>
-      <div class="ik-takeaway">The 3R IK has become one PK3 solve followed by two PK1 solves.</div>
+      <div class="ik-takeaway">For each of the two PK3 values of \(\theta_3\), PK2 can return two pairs \((\theta_1,\theta_2)\).</div>
+    </section>
+
+    <section class="slide">
+      <p class="slide-kicker">Geometric 3R IK · PK2 construction</p>
+      <h2 class="slide-title">PK2 introduces two intermediate vectors</h2>
+      <p class="slide-subtitle">Let \(\mathbf x=R(\boldsymbol\omega_2,\theta_2)\mathbf t\). On the common sphere centered at \(\mathbf c\), intersect the joint-2 orbit through \(\mathbf t\) with the inverse joint-1 orbit through \(\mathbf p_d\).</p>
+      <div class="layout-40-60 tight-gap">
+        <div>
+          <div class="equation compact">
+            \[
+            \eta=\boldsymbol\omega_2^T\mathbf t,\qquad
+            \zeta=\boldsymbol\omega_1^T\mathbf q
+            \]
+          </div>
+          <div class="equation compact">
+            \[
+            \gamma=\sqrt{\|\mathbf t\|^2-\eta^2-\zeta^2}
+            \]
+          </div>
+          <div class="equation compact boxed-result">
+            \[
+            \boxed{\mathbf x_\pm=\zeta\boldsymbol\omega_1+\eta\boldsymbol\omega_2
+            \pm\gamma(\boldsymbol\omega_1\times\boldsymbol\omega_2)}
+            \]
+          </div>
+          <div class="condition-list">
+            <div><strong>blue \(\mathcal C_2\)</strong><span>sphere ∩ plane normal to \(\boldsymbol\omega_2\), passing through \(\mathbf t\)</span></div>
+            <div><strong>orange \(\mathcal C_1\)</strong><span>sphere ∩ plane normal to \(\boldsymbol\omega_1\), passing through \(\mathbf q\)</span></div>
+          </div>
+        </div>
+        <div data-custom3r-ik data-mode="pk2-geometry"></div>
+      </div>
+      <div class="ik-takeaway">The two red circle–circle intersections are \(\mathbf x_\pm\). Then solve \(R(\boldsymbol\omega_2,\theta_2^\pm)\mathbf t=\mathbf x_\pm\) and \(R(\boldsymbol\omega_1,\theta_1^\pm)\mathbf x_\pm=\mathbf q\) with PK1.</div>
+    </section>
+
+    <section class="slide">
+      <p class="slide-kicker">Geometric 3R IK · PK2 branch A</p>
+      <h2 class="slide-title">Two solutions for \(\theta_3=-125.989^\circ\)</h2>
+      <p class="slide-subtitle">Compute \(\mathbf t\), form \(\mathbf x_\pm\), then apply the two PK1 registrations inside PK2.</p>
+      <div class="layout-40-60 tight-gap">
+        <div>
+          <div class="equation compact">
+            \[
+            \mathbf t=\begin{bmatrix}1.11855\\.03631\\.75000\end{bmatrix},\quad
+            (\eta,\zeta,\gamma)=(.03631,.82939,1.06102)
+            \]
+          </div>
+          <div class="equation micro">
+            \[
+            \mathbf x_+=\begin{bmatrix}-1.06102\\.03631\\.82939\end{bmatrix},\qquad
+            \mathbf x_-=\begin{bmatrix}1.06102\\.03631\\.82939\end{bmatrix}
+            \]
+          </div>
+          <div class="condition-list">
+            <div><strong>\(\mathbf x_+\)</strong><span>\((\theta_1,\theta_2)=(-144.280^\circ,-108.143^\circ)\)</span></div>
+            <div><strong>\(\mathbf x_-\)</strong><span>\((\theta_1,\theta_2)=(31.800^\circ,-4.172^\circ)\)</span></div>
+          </div>
+        </div>
+        <div data-custom3r-ik data-mode="pk2-branch-a"></div>
+      </div>
+      <div class="ik-takeaway">Both configurations place the tool at the same \(\mathbf p_d\); their orientations are different and unconstrained.</div>
+    </section>
+
+    <section class="slide">
+      <p class="slide-kicker">Geometric 3R IK · PK2 branch B</p>
+      <h2 class="slide-title">Two solutions for \(\theta_3=-170.000^\circ\)</h2>
+      <p class="slide-subtitle">The second PK3 intersection produces another pair of intermediate vectors and therefore another two PK2 branches.</p>
+      <div class="layout-40-60 tight-gap">
+        <div>
+          <div class="equation compact">
+            \[
+            \mathbf t=\begin{bmatrix}.52279\\.98953\\.75000\end{bmatrix},\quad
+            (\eta,\zeta,\gamma)=(.98953,.82939,.38461)
+            \]
+          </div>
+          <div class="equation micro">
+            \[
+            \mathbf x_+=\begin{bmatrix}-.38461\\.98953\\.82939\end{bmatrix},\qquad
+            \mathbf x_-=\begin{bmatrix}.38461\\.98953\\.82939\end{bmatrix}
+            \]
+          </div>
+          <div class="condition-list">
+            <div><strong>\(\mathbf x_+\)</strong><span>\((\theta_1,\theta_2)=(-77.480^\circ,-59.757^\circ)\)</span></div>
+            <div><strong>\(\mathbf x_-\)</strong><span>\((\theta_1,\theta_2)=(-35.000^\circ,-10.000^\circ)\)</span></div>
+          </div>
+        </div>
+        <div data-custom3r-ik data-mode="pk2-branch-b"></div>
+      </div>
+      <div class="ik-takeaway">This branch contains the original generating configuration and a second configuration with the same tool position.</div>
     </section>
 
     <section class="slide">
       <p class="slide-kicker">Geometric 3R IK · Branches</p>
-      <h2 class="slide-title">Branch propagation and candidate validation</h2>
-      <p class="slide-subtitle">PK1 is single-valued modulo \(2\pi\) when nondegenerate; the principal branching occurs in PK3.</p>
+      <h2 class="slide-title">Four position-IK solutions for custom_3R_new_0</h2>
+      <p class="slide-subtitle">Both PK3 intersections are valid. Each feeds PK2, whose two intermediate vectors produce two more branches.</p>
       <div class="branch-tree">
-        <article class="branch-node"><strong>PK3</strong><p>\(\theta_3^+,\theta_3^-\)</p><p class="small-text">two circle intersections</p></article>
+        <article class="branch-node"><strong>PK3</strong><p>two \(\theta_3\) values</p><p class="small-text">two orbit–sphere intersections</p></article>
         <div class="flow-arrow">→</div>
-        <article class="branch-node"><strong>PK1 per branch</strong><p>\(\theta_1^\pm\)</p><p class="small-text">point on axis 2</p></article>
+        <article class="branch-node"><strong>PK2 per \(\theta_3\)</strong><p>two \(\mathbf x_\pm\) vectors</p><p class="small-text">two elbow branches</p></article>
         <div class="flow-arrow">→</div>
-        <article class="branch-node"><strong>PK1 per branch</strong><p>\(\theta_2^\pm\)</p><p class="small-text">residual rotation</p></article>
+        <article class="branch-node"><strong>Total</strong><p>\(2\times2=4\)</p><p class="small-text">all reach \(\mathbf p_d\)</p></article>
       </div>
-      <table class="branch-table" aria-label="IK candidate checks">
-        <thead><tr><th>check</th><th>reject when</th><th>meaning</th></tr></thead>
+      <table class="branch-table" aria-label="Four position IK solutions">
+        <thead><tr><th>solution</th><th>\(\theta_1\)</th><th>\(\theta_2\)</th><th>\(\theta_3\)</th></tr></thead>
         <tbody>
-          <tr><td>subproblem feasibility</td><td>circle constraints fail</td><td>target is not on the reachable manifold</td></tr>
-          <tr><td>joint limits</td><td>\(\theta_i\notin[\theta_i^-,\theta_i^+]\)</td><td>branch is mechanically unavailable</td></tr>
-          <tr><td>forward residual</td><td>\(\|g(\boldsymbol\theta)-g_d\|>\varepsilon\)</td><td>candidate is invalid</td></tr>
+          <tr><td>1</td><td>\(-144.280^\circ\)</td><td>\(-108.143^\circ\)</td><td>\(-125.989^\circ\)</td></tr>
+          <tr><td>2</td><td>\(31.800^\circ\)</td><td>\(-4.172^\circ\)</td><td>\(-125.989^\circ\)</td></tr>
+          <tr><td>3</td><td>\(-77.480^\circ\)</td><td>\(-59.757^\circ\)</td><td>\(-170.000^\circ\)</td></tr>
+          <tr><td>4</td><td>\(-35.000^\circ\)</td><td>\(-10.000^\circ\)</td><td>\(-170.000^\circ\)</td></tr>
         </tbody>
       </table>
+      <div class="ik-takeaway">Forward kinematics of every row gives \(\mathbf p=(.882624,.589970,1.829387)\,\mathrm m\) within numerical tolerance.</div>
     </section>
 
     <section class="slide">
@@ -1060,7 +1152,7 @@
             <li>exploits \(a_1=0\), intersecting axes;</li>
             <li>fixed points cancel joint motions;</li>
             <li>circle intersections expose feasibility;</li>
-            <li>PK3 → PK1 → PK1.</li>
+            <li>PK3 → PK2, with two branches at each stage.</li>
           </ul>
         </article>
       </div>
@@ -1075,13 +1167,189 @@
         <div class="derivation-row"><span class="tag">1</span><p>Shift \(z=z_e-d_1\), then use \(R=x^2+y^2+z^2\) to eliminate \(\theta_1\).</p></div>
         <div class="derivation-row"><span class="tag">2</span><p>Write \(R\) and \(z\) as coefficient equations in \(c_2,s_2\); squaring and adding eliminates \(\theta_2\).</p></div>
         <div class="derivation-row"><span class="tag">3</span><p>Backpropagation subtracts polar angles with \(\operatorname{atan2}\).</p></div>
-        <div class="derivation-row"><span class="tag">4</span><p>For \(a_1=0\), the axes’ intersection gives PK3 → PK1 → PK1.</p></div>
+        <div class="derivation-row"><span class="tag">4</span><p>For \(a_1=0\), position IK gives PK3 → PK2 and up to four branches.</p></div>
       </div>
       <p class="source-note">Further reading: R. Murray, Z. Li &amp; S. Sastry, <em>A Mathematical Introduction to Robotic Manipulation</em>, §3.3.</p>
     </section>
 
+    <section class="slide title-slide">
+      <p class="slide-kicker">Advanced formulation · geometric preview</p>
+      <h1 class="hero-title">Inverse kinematics as<br><span>circle–torus intersection</span></h1>
+      <p class="hero-subtitle">The IK model through conformal geometric algebra lens.</p>
+      <div class="equation boxed-result">
+        \[
+        e^{\theta_1S_1}e^{\theta_2S_2}e^{\theta_3S_3}P=P_d
+        \quad\Longleftrightarrow\quad
+        X\in C_B\cap C_A(\theta_2)
+        \]
+      </div>
+      <p class="source-note">Geometric construction adapted from Nayak &amp; Salunkhe, <em>Inverse kinematic solution for generic 3R positional robots using Conformal Geometric Algebra</em>.</p>
+    </section>
+
+    <section class="slide">
+      <p class="slide-kicker">CGA view · the two circles</p>
+      <h2 class="slide-title">Start with one fixed circle and one moving circle</h2>
+      <p class="slide-subtitle">Both are ordinary Euclidean circles; CGA makes the incidence and rigid-motion operations algebraically uniform.</p>
+      <div class="layout-40-60 tight-gap">
+        <div>
+          <div class="condition-list">
+            <div><strong>fixed \(C_B\)</strong><span>passes through \(p_d\), is centered on axis 1, and lies in a plane normal to \(\boldsymbol\omega_1\)</span></div>
+            <div><strong>home \(C_A\)</strong><span>passes through the home tool point \(p\), is centered on axis 3, and lies in a plane normal to \(\boldsymbol\omega_3\)</span></div>
+          </div>
+          <div class="equation compact">
+            \[
+            C_B=\operatorname{Orb}_{\omega_1}(p_d),\qquad
+            C_A=\operatorname{Orb}_{\omega_3}(p)
+            \]
+          </div>
+          <div data-cga-target="inline"></div>
+        </div>
+        <div data-custom3r-ik data-mode="cga-circles"></div>
+      </div>
+      <div class="ik-takeaway">The target circle contains every point that joint 1 can rotate into \(p_d\); the home circle contains every point joint 3 can reach from \(p\).</div>
+    </section>
+
+    <section class="slide">
+      <p class="slide-kicker">CGA view · pose the IK problem</p>
+      <h2 class="slide-title">Rotate the home circle about axis 2</h2>
+      <p class="slide-subtitle">Joint 2 carries the entire joint-3 orbit. Watch only \(C_A\): a red sphere appears whenever it intersects the fixed target circle.</p>
+      <div class="layout-40-60 tight-gap">
+        <div>
+          <div class="equation compact">
+            \[
+            C_A(\theta_2)=\mathcal R_2(\theta_2)\,C_A\,\widetilde{\mathcal R}_2(\theta_2)
+            \]
+          </div>
+          <div class="equation boxed-result">
+            \[
+            \boxed{X(\theta_2)=C_A(\theta_2)\vee C_B}
+            \]
+          </div>
+          <p class="small-text">The meet \(\vee\) returns their candidate point pair. A real null point satisfies \(X\cdot X=0\).</p>
+        </div>
+        <div data-custom3r-ik data-mode="cga-circle-motion"></div>
+      </div>
+      <div class="ik-takeaway">No torus is drawn yet: this slide isolates the moving circle and marks each real circle–circle intersection as it occurs.</div>
+    </section>
+
+    <section class="slide">
+      <p class="slide-kicker">CGA view · choose a branch</p>
+      <h2 class="slide-title">Choose an intersection, then rotate \(C_A\) to it</h2>
+      <p class="slide-subtitle">Raising \(p_d\) by \(1\,\mathrm m\) leaves two real branches. Use the circle selector in the visualization to replay either one.</p>
+      <div class="layout-40-60 tight-gap">
+        <div>
+          <table class="branch-table" aria-label="CGA theta 2 roots">
+            <thead><tr><th>branch</th><th>\(\theta_2\)</th></tr></thead>
+            <tbody>
+              <tr><td>1</td><td>\(-46.888^\circ\)</td></tr>
+              <tr><td>2</td><td>\(-132.273^\circ\)</td></tr>
+            </tbody>
+          </table>
+          <div class="equation compact">
+            \[
+            X_i=R_1(-\theta_{1i})p_d
+               =R_2(\theta_{2i})R_3(\theta_{3i})p
+            \]
+          </div>
+        </div>
+        <div data-custom3r-ik data-mode="cga-four-theta2"></div>
+      </div>
+      <div class="ik-takeaway">Selecting a branch resets \(C_A\) to home and animates it to the corresponding point \(x_i\in C_B\).</div>
+    </section>
+
+    <section class="slide">
+      <p class="slide-kicker">CGA view · recover \(\theta_3\)</p>
+      <h2 class="slide-title">Undo joint 2, then measure an arc on \(C_A\)</h2>
+      <p class="slide-subtitle">Start from either selected IK circle already positioned at its intersection with \(C_B\).</p>
+      <div class="layout-40-60 tight-gap">
+        <div>
+          <div class="derivation-stack">
+            <div class="derivation-row"><span class="tag">1</span><p>Take its intersection point \(x\in C_B\cap C_A(\theta_2)\).</p></div>
+            <div class="derivation-row"><span class="tag">2</span><p>Reverse the circle rotation: \(a=R_2(-\theta_2)x\in C_A\).</p></div>
+            <div class="derivation-row"><span class="tag">3</span><p>Solve \(R_3(\theta_3)p=a\): branch 1 gives \(\theta_3=-97.515^\circ\); branch 2 gives \(-39.698^\circ\).</p></div>
+          </div>
+          <div class="equation compact boxed-result">
+            \[R_3(\theta_3)p=R_2(-\theta_2)x\]
+          </div>
+        </div>
+        <div data-custom3r-ik data-mode="cga-backsolve"></div>
+      </div>
+      <div class="ik-takeaway">The circle and its intersection point move together under \(-\theta_2\); only after they reach home does the joint-3 rotation begin.</div>
+    </section>
+
+    <section class="slide">
+      <p class="slide-kicker">CGA view · complete one branch</p>
+      <h2 class="slide-title">Reach the intersection, then travel along \(C_B\)</h2>
+      <p class="slide-subtitle">Forward motion makes the geometric factorization visible in the same order as the product of rotations.</p>
+      <div class="layout-40-60 tight-gap">
+        <div>
+          <div class="equation compact">
+            \[
+            p\xrightarrow{\ \theta_3\ }R_3p
+            \xrightarrow{\ \theta_2\ }x
+            \xrightarrow{\ \theta_1\ }p_d
+            \]
+          </div>
+          <div class="condition-list">
+            <div><strong>joint 3</strong><span>moves \(p\) around the home circle \(C_A\)</span></div>
+            <div><strong>joint 2</strong><span>carries that point and circle to the intersection \(x\)</span></div>
+            <div><strong>joint 1</strong><span>keeps the point on \(C_B\) and rotates \(x\) to \(p_d\)</span></div>
+          </div>
+          <div class="equation micro boxed-result">
+            \[R_1(8.561^\circ)R_2(-46.888^\circ)R_3(-97.515^\circ)p=p_d\]
+          </div>
+        </div>
+        <div data-custom3r-ik data-mode="cga-forward"></div>
+      </div>
+      <div class="ik-takeaway">The final joint-1 motion remains on the fixed orange circle by construction, so it ends exactly at \(p_d\).</div>
+    </section>
+
+    <section class="slide">
+      <p class="slide-kicker">CGA view · interactive construction</p>
+      <h2 class="slide-title">Choose \(p_d\), then build an IK branch by dragging</h2>
+      <p class="slide-subtitle">Use the six sliders in order. The target controls rebuild \(C_B\); the joint controls reproduce the circle construction.</p>
+      <div class="layout-40-60 tight-gap">
+        <div>
+          <div class="derivation-stack">
+            <div class="derivation-row"><span class="tag">1</span><p>Set \(p_x,p_y,p_z\) to place \(p_d\) and rebuild \(C_B\).</p></div>
+            <div class="derivation-row"><span class="tag">2</span><p>Drag \(\theta_2\). Within \(4^\circ\) of a real solution, the circle snaps to the intersection.</p></div>
+            <div class="derivation-row"><span class="tag">3</span><p>Drag \(\theta_2\) back toward zero; the latched point travels with \(C_A\).</p></div>
+            <div class="derivation-row"><span class="tag">4</span><p>Adjust \(\theta_3\) to meet that point, then \(\theta_1\) to reach \(p_d\).</p></div>
+          </div>
+          <p class="small-text">Some target positions have fewer real branches—or none. The status line reports the current count.</p>
+        </div>
+        <div data-custom3r-ik data-mode="cga-interactive"></div>
+      </div>
+      <div class="ik-takeaway">The sliders expose the same factorization as the analytical solve: circle intersection → reverse joint 2 → joint 3 arc → joint 1 arc.</div>
+    </section>
+
+    <section class="slide">
+      <p class="slide-kicker">CGA view · global solution picture</p>
+      <h2 class="slide-title">The swept circle is a torus; crossings are IK branches</h2>
+      <p class="slide-subtitle">Let \(\theta_2\) span one revolution. For the raised target, \(C_B\) cuts the swept surface at two real branch points.</p>
+      <div class="layout-40-60 tight-gap">
+        <div>
+          <div class="equation compact boxed-result">
+            \[
+            \begin{aligned}
+            \mathcal T&=\bigcup_{\theta_2\in[-\pi,\pi)}C_A(\theta_2),\\
+            C_B\cap\mathcal T&=\{X_1,X_2\}.
+            \end{aligned}
+            \]
+          </div>
+          <div class="condition-list">
+            <div><strong>what CGA adds</strong><span>points, spheres, planes, circles, meets, and rotors share one algebraic language</span></div>
+            <div><strong>scope</strong><span>the full derivation and quartic expansion are intentionally deferred</span></div>
+          </div>
+          <p class="small-text">For Euclidean 3-space, the paper uses the five-dimensional conformal algebra \(\mathcal G_{4,1}\), i.e. signature \((4,1,0)\).</p>
+        </div>
+        <div data-custom3r-ik data-mode="cga-torus"></div>
+      </div>
+      <div class="ik-takeaway"><strong>The point of this preview:</strong> the algebra may be advanced, but its geometry is beautifully direct—IK is an intersection problem.</div>
+    </section>
+
   </main>
   <script src="../js/deck/nav-runtime.js"></script>
-  <script type="module" src="../js/main.js?v=20260814-20"></script>
+  <script type="module" src="../js/main.js?v=20260818-35"></script>
 </body>
 </html>

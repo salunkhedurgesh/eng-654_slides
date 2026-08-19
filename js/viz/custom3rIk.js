@@ -13,11 +13,17 @@ const modelAssetUrl = (filename) => {
 };
 const URDF_URL = modelAssetUrl('custom_3R_new.urdf');
 const TARGET_Q_DEG = [-35, -10, -170];
+const ZERO_TARGET_Q_DEG = [-35, -10, -170];
 const IK_SOLUTION_DEG = [
   [-35, -10, -170],
   [-14.6556883192, -6.6055592987, -147.6075456696],
   [178.4024280182, -147.5329051962, -61.1502417161],
   [-69.0983199015, -61.9762166618, 166.6779007736]
+];
+const CGA_TARGET_Z_OFFSET = 1;
+const CGA_IK_SOLUTION_DEG = [
+  [8.560853671659, -46.888070562430, -97.515419825156],
+  [-169.572383340993, -132.273182994342, -39.698098590009]
 ];
 const IKS_VISIBILITY = [true, false, false, false];
 
@@ -117,6 +123,7 @@ async function loadRobotModelFromUrdf() {
   robotModel = model;
   ikExample = { targetQ, solutions, eePosition, ...derived };
   bindLectureExample(ikExample, model);
+  bindCgaExample(ikExample);
   return model;
 }
 
@@ -171,6 +178,18 @@ function bindLectureExample(example, model) {
   const boundElements = [...document.querySelectorAll('[data-custom3r-target]')];
   boundElements.forEach((element) => { element.innerHTML = bindings[element.dataset.custom3rTarget] || ''; });
   if (boundElements.length && window.MathJax?.typesetPromise) window.MathJax.typesetPromise(boundElements);
+}
+
+function bindCgaExample(example) {
+  const target = example.eePosition.clone().add(new THREE.Vector3(0, 0, CGA_TARGET_Z_OFFSET));
+  const [x, y, z] = target.toArray().map((value) => fixed(value, 4));
+  const bindings = {
+    inline: `\\(\\mathbf p_d=(${x},${y},${z})\\,\\mathrm m\\)`,
+    vector: `\\[\\mathbf p_d=\\begin{bmatrix}${x}\\\\${y}\\\\${z}\\end{bmatrix}\\mathrm m\\]`
+  };
+  const elements = [...document.querySelectorAll('[data-cga-target]')];
+  elements.forEach((element) => { element.innerHTML = bindings[element.dataset.cgaTarget] || ''; });
+  if (elements.length && window.MathJax?.typesetPromise) window.MathJax.typesetPromise(elements);
 }
 
 export function initCustom3RIkDemos() {
@@ -323,6 +342,17 @@ async function buildMode(kit) {
     case 'circle-distance': return buildCircleDistance(kit);
     case 'pk1': return buildPk1(kit);
     case 'pk3': return buildPk3(kit);
+    case 'pk3-ik': return buildPk3Ik(kit);
+    case 'pk2-geometry': return buildPk2Geometry(kit);
+    case 'pk2-branch-a': return buildPk2Branch(kit, 'a');
+    case 'pk2-branch-b': return buildPk2Branch(kit, 'b');
+    case 'cga-circles': return buildCgaCircles(kit);
+    case 'cga-circle-motion': return buildCgaCircleMotion(kit);
+    case 'cga-four-theta2': return buildCgaFourTheta2(kit);
+    case 'cga-backsolve': return buildCgaBacksolve(kit);
+    case 'cga-forward': return buildCgaForward(kit);
+    case 'cga-torus': return buildCgaTorus(kit);
+    case 'cga-interactive': return buildCgaInteractive(kit);
     case 'intersecting': return buildIntersecting(kit);
     case 'pipeline': return buildPipeline(kit);
     default: return buildDhMotion(kit);
@@ -704,31 +734,216 @@ function buildPk1(kit) {
 
 function buildPk3(kit) {
   kit.setCamera([6.2, 5.2, 6.5], [0, 1, 0]);
-  addRing(kit.world, new THREE.Vector3(0, 0, 1), 2.1, 0x111111, 2);
-  addRing(kit.world, new THREE.Vector3(1.9, 0, 1), 1.55, 0xff0000, 2);
+  const orbitCenter = new THREE.Vector3(0, 0, 1);
+  const qCenter = new THREE.Vector3(1.9, 0, 1);
+  const pPosition = new THREE.Vector3(-2.1, 0, 1);
+  kit.world.add(makeAxis(new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, 1), 4.5, 0x111111));
+  addLabel(kit.world, new THREE.Vector3(0, 0, 2.75), 'ω · rotation axis');
+  addRing(kit.world, orbitCenter, 2.1, 0x111111, 2);
+  addRing(kit.world, qCenter, 1.55, 0xff0000, 2);
+  const p = sphere(.14, 0xd79b00);
+  const q = sphere(.14, 0xff0000);
+  p.position.copy(pPosition);
+  q.position.copy(qCenter);
+  kit.world.add(p, q);
+  addLabel(kit.world, pPosition.clone().add(new THREE.Vector3(-.18, -.12, .3)), 'p', 0xd79b00);
+  addLabel(kit.world, qCenter.clone().add(new THREE.Vector3(.15, .18, .3)), 'q · distance center', 0xff0000);
   const p1 = sphere(.12, 0x3f6ea8), p2 = sphere(.12, 0x3f6ea8);
   const x = (2.1 ** 2 - 1.55 ** 2 + 1.9 ** 2) / (2 * 1.9);
   const y = Math.sqrt(2.1 ** 2 - x ** 2);
   p1.position.set(x, y, 1); p2.position.set(x, -y, 1);
   kit.world.add(p1, p2);
-  kit.note.textContent = 'PK3 · orbit circle ∩ distance circle · the two blue points are θ = γ ± φ';
+  kit.note.textContent = 'PK3 · rotate p about ω; the red circle is the planar distance constraint centered at q';
   return (time) => {
     const pulse = 1 + .18 * Math.sin(time * 3);
     p1.scale.setScalar(pulse); p2.scale.setScalar(2 - pulse);
   };
 }
 
-function buildIntersecting(kit) {
-  kit.setCamera([6.5, 5.3, 6.3], [1, 1, -.4]);
+async function buildPk3Ik(kit) {
+  kit.setCamera([7.2, 6.2, 6.4], [1.35, .8, 1.15]);
+  const model = zeroRobotModel();
+  const targetQ = ZERO_TARGET_Q_DEG.map((angle) => angle * DEG);
+  const targetPose = zeroPrefixMatrix(targetQ, 3);
+  const targetPoint = model.homeTool.clone().applyMatrix4(targetPose);
+  const c = model.axisPoints[1];
+  const axis3Point = model.axisPoints[2];
+  const orbitCenter = axis3Point.clone().add(new THREE.Vector3(0, 0, .75));
+  const orbitRadius = 1.5;
+  const delta = targetPoint.distanceTo(c);
+  const roots = [-170, -125.9892335838].map((angle) => angle * DEG);
+  const robot = await createZeroRobot(kit.world, [0, 0, 0], { opacity: .86 });
+
+  kit.world.add(makeAxis(c, model.axes[0], 3.9, 0x111111));
+  kit.world.add(makeAxis(c, model.axes[1], 4.3, 0xff0000));
+  const axis3Line = makeAxis(axis3Point, model.axes[2], 3.3, 0x777777);
+  kit.world.add(axis3Line);
+  const orbit = addRing(kit.world, orbitCenter, orbitRadius, 0x111111, 2);
+  const distanceSphere = addWireSphere(kit.world, c, delta, 0xff0000);
+  addLabel(kit.world, c.clone().add(new THREE.Vector3(-.25, -.25, .22)), 'c = (0,0,1)', 0x3f6ea8);
+  const axis3Label = addLabel(kit.world, axis3Point.clone().add(new THREE.Vector3(.15, .12, 1.45)), 'joint-3 axis');
+  const targetMarker = sphere(.12, 0x18865e);
+  targetMarker.position.copy(targetPoint);
+  kit.world.add(targetMarker);
+  const targetLabel = addLabel(kit.world, targetPoint.clone().add(new THREE.Vector3(-.5, .45, .65)), 'p_d sets δ', 0x18865e);
+  const deltaDimension = addDimension(kit.world, c, targetPoint, `δ = ${fixed(delta, 3)} m`, 0x18865e);
+
+  const candidateGroup = new THREE.Group();
+  kit.world.add(candidateGroup);
+  const candidates = roots.map((angle, index) => {
+    const point = model.homeTool.clone().applyMatrix4(expRevolute(model.axes[2], axis3Point, angle));
+    const marker = sphere(.13, 0x3f6ea8);
+    marker.position.copy(point);
+    candidateGroup.add(marker);
+    const offset = index
+      ? new THREE.Vector3(.38, -.18, -.18)
+      : new THREE.Vector3(-.28, .16, .52);
+    addLabel(candidateGroup, point.clone().add(offset), `θ₃${index ? '⁻' : '⁺'} = ${fixed(angle / DEG, 1)}°`, 0x3f6ea8);
+    return marker;
+  });
+  const toolMarker = sphere(.105, 0xd79b00);
+  kit.world.add(toolMarker);
+  const toolLabel = addLabel(kit.world, model.homeTool.clone().add(new THREE.Vector3(.16, .12, .3)), 'p(θ₃)', 0xd79b00);
+  let lastStage = '';
+  let startTime;
+  return (time) => {
+    if (startTime === undefined) startTime = time;
+    const phase = (time - startTime) % 12;
+    const sphereProgress = THREE.MathUtils.smoothstep(Math.min(phase / 2.4, 1), 0, 1);
+    const rotating = phase >= 6;
+    const rotateProgress = phase < 6 ? 0 : phase < 10
+      ? THREE.MathUtils.smoothstep((phase - 6) / 4, 0, 1)
+      : 1;
+    const theta3 = roots[0] * rotateProgress;
+    const stage = phase < 3 ? '1 · Build the sphere: δ = ||p_d − c|| = 1.347 m.'
+      : phase < 6 ? '2 · Reveal the robot at θ₃ = 0: the orange tool point is p.'
+      : phase < 10 ? `3 · Rotate joint 3: θ₃ = ${fixed(theta3 / DEG, 1)}°.`
+      : '3 · p has reached the blue circle–sphere intersection: θ₃ = −170°.';
+    if (stage !== lastStage) {
+      kit.note.textContent = stage;
+      lastStage = stage;
+    }
+    distanceSphere.scale.setScalar(Math.max(.001, sphereProgress));
+    robot.group.visible = phase >= 3;
+    axis3Line.visible = phase >= 3;
+    axis3Label.visible = phase >= 3;
+    orbit.visible = rotating;
+    candidateGroup.visible = rotating;
+    toolMarker.visible = phase >= 3;
+    toolLabel.visible = phase >= 3;
+    targetMarker.visible = phase < 3 || phase >= 10;
+    targetLabel.visible = phase < 3;
+    deltaDimension.visible = phase < 3;
+    robot.update([0, 0, theta3]);
+    toolMarker.position.copy(model.homeTool).applyMatrix4(expRevolute(model.axes[2], axis3Point, theta3));
+    toolLabel.position.copy(toolMarker.position).add(new THREE.Vector3(.16, .12, .3));
+    const pulse = 1 + .12 * Math.sin(time * 3);
+    candidates[0].scale.setScalar(pulse);
+    candidates[1].scale.setScalar(2 - pulse);
+  };
+}
+
+async function buildPk2Branch(kit, branch) {
+  kit.setCamera([7.1, 5.8, 6.3], [1.25, .7, 1.05]);
+  const solutionSets = {
+    a: [
+      [-144.280191892629, -108.143491292260, -125.989233583833],
+      [31.799947787715, -4.171947158659, -125.989233583833]
+    ],
+    b: [
+      [-77.480244104914, -59.756939433423, -170],
+      [-35, -10, -170]
+    ]
+  };
+  const solutions = solutionSets[branch].map((q) => q.map((angle) => angle * DEG));
+  const palettes = [
+    [0x333638, 0x3f6ea8, 0x94acd0, 0x3f6ea8],
+    [0x333638, 0xd79b00, 0xe6c06c, 0xd79b00]
+  ];
+  const robots = await Promise.all(solutions.map((q, index) => createZeroRobot(kit.world, q, {
+    opacity: .62,
+    colors: palettes[index]
+  })));
+  const model = zeroRobotModel();
+  const targetQ = ZERO_TARGET_Q_DEG.map((angle) => angle * DEG);
+  const targetPoint = model.homeTool.clone().applyMatrix4(zeroPrefixMatrix(targetQ, 3));
+  const target = sphere(.15, 0x18865e);
+  target.position.copy(targetPoint);
+  kit.world.add(target);
+  addLabel(kit.world, targetPoint.clone().add(new THREE.Vector3(.15, .12, .35)), 'common p_d', 0x18865e);
+  robots.forEach((robot, index) => addRobotVisibilityToggle(kit, robot.group, `IK ${index + 1}`, true));
+  kit.note.textContent = branch === 'a'
+    ? 'θ₃ = −125.989° · blue and orange are the two PK2 configurations at the same green target'
+    : 'θ₃ = −170.000° · blue and orange are the two PK2 configurations at the same green target';
+  return () => robots.forEach((robot, index) => robot.update(solutions[index]));
+}
+
+function buildPk2Geometry(kit) {
+  kit.setCamera([5.8, 5.4, 5.8], [.2, .75, 1.45]);
   const c = new THREE.Vector3(0, 0, 1);
-  kit.world.add(makeAxis(c, new THREE.Vector3(0, 0, 1), 4, 0x111111));
-  kit.world.add(makeAxis(c, new THREE.Vector3(0, 1, 0), 4, 0xff0000));
-  kit.world.add(sphere(.13, 0x3f6ea8));
-  kit.world.children.at(-1).position.copy(c);
-  addLabel(kit.world, c, 'c · fixed by joints 1 and 2');
-  addLabel(kit.world, c.clone().add(new THREE.Vector3(.55, .15, .15)), 'a₁ = 0', 0x3f6ea8);
-  kit.note.textContent = 'intersecting axes share c · distances from c eliminate θ₁ and θ₂';
+  const w1 = new THREE.Vector3(0, 0, 1);
+  const w2 = new THREE.Vector3(0, 1, 0);
+  const q = new THREE.Vector3(.88262378, .58997049, .82938706);
+  const t = new THREE.Vector3(.52278837, .98952773, .75);
+  const radius = q.length();
+  const eta = w2.dot(t);
+  const zeta = w1.dot(q);
+  const circle2Center = c.clone().addScaledVector(w2, eta);
+  const circle1Center = c.clone().addScaledVector(w1, zeta);
+  const circle2Radius = Math.sqrt(Math.max(0, radius ** 2 - eta ** 2));
+  const circle1Radius = Math.sqrt(Math.max(0, radius ** 2 - zeta ** 2));
+  const gamma = Math.sqrt(Math.max(0, radius ** 2 - eta ** 2 - zeta ** 2));
+
+  addWireSphere(kit.world, c, radius, 0x888888);
+  addDiscInPlane(kit.world, circle2Center, circle2Radius, w2, 0x3f6ea8);
+  addDiscInPlane(kit.world, circle1Center, circle1Radius, w1, 0xd79b00);
+  addRingInPlane(kit.world, circle2Center, circle2Radius, w2, 0x3f6ea8, 2);
+  addRingInPlane(kit.world, circle1Center, circle1Radius, w1, 0xd79b00, 2);
+  kit.world.add(makeAxis(c, w1, 3.6, 0x111111));
+  kit.world.add(makeAxis(c, w2, 3.9, 0xff0000));
+
+  const centerMarker = sphere(.09, 0x111111);
+  centerMarker.position.copy(c);
+  const tMarker = sphere(.12, 0x3f6ea8);
+  tMarker.position.copy(c).add(t);
+  const qMarker = sphere(.12, 0x18865e);
+  qMarker.position.copy(c).add(q);
+  kit.world.add(centerMarker, tMarker, qMarker);
+  addLabel(kit.world, c.clone().add(new THREE.Vector3(-.22, -.22, .18)), 'c');
+  addLabel(kit.world, tMarker.position.clone().add(new THREE.Vector3(.62, .2, -.42)), 't(θ₃)', 0x3f6ea8);
+  addLabel(kit.world, qMarker.position.clone().add(new THREE.Vector3(.7, -.5, .62)), 'p_d', 0x18865e);
+
+  [-1, 1].forEach((sign) => {
+    const point = c.clone().add(new THREE.Vector3(sign * gamma, eta, zeta));
+    const marker = sphere(.13, 0xff0000);
+    marker.position.copy(point);
+    kit.world.add(marker);
+  });
+  addLabel(
+    kit.world,
+    c.clone().add(new THREE.Vector3(-.78, eta + .24, zeta + .72)),
+    'x₊ , x₋ · intersections',
+    0xff0000
+  );
+  kit.note.textContent = 'PK2 · blue C₂ is the joint-2 orbit through t; orange C₁ is the inverse joint-1 orbit through p_d; red points are x±';
   return () => {};
+}
+
+async function buildIntersecting(kit) {
+  kit.setCamera([7.1, 5.8, 6.3], [1.25, .75, 1]);
+  const model = zeroRobotModel();
+  const robot = await createZeroRobot(kit.world, [0, 0, 0]);
+  const c = model.axisPoints[1];
+  kit.world.add(makeAxis(c, model.axes[0], 4, 0x111111));
+  kit.world.add(makeAxis(c, model.axes[1], 4.5, 0xff0000));
+  const marker = sphere(.13, 0x3f6ea8);
+  marker.position.copy(c);
+  kit.world.add(marker);
+  addLabel(kit.world, c.clone().add(new THREE.Vector3(.12, .12, .24)), 'c = (0,0,1) m', 0x3f6ea8);
+  addLabel(kit.world, c.clone().add(new THREE.Vector3(0, 1.7, .15)), 'joint 2 · ω₂ = eᵧ', 0xff0000);
+  addLabel(kit.world, c.clone().add(new THREE.Vector3(.15, 0, 1.7)), 'joint 1 · ω₁ = e_z');
+  kit.note.textContent = 'custom_3R_new_0.urdf · joint axes 1 and 2 intersect at c, hence a₁ = 0';
+  return () => robot.update([0, 0, 0]);
 }
 
 async function buildPipeline(kit) {
@@ -746,6 +961,434 @@ async function buildPipeline(kit) {
     q.forEach((_, i) => { q[i] += (desired[i] - q[i]) * Math.min(1, 7 * dt); });
     robot.update(q);
   };
+}
+
+function projectToAxis(point, axisPoint, axis) {
+  return axisPoint.clone().addScaledVector(axis, point.clone().sub(axisPoint).dot(axis));
+}
+
+function cgaCircleData(targetOverride, solutionsOverride) {
+  const { axes, axisPoints, homeTool } = robotModel;
+  const target = targetOverride?.clone() || ikExample.eePosition.clone().add(new THREE.Vector3(0, 0, CGA_TARGET_Z_OFFSET));
+  const solutions = solutionsOverride || CGA_IK_SOLUTION_DEG.map((q) => q.map((angle) => angle * DEG));
+  const fixedCenter = projectToAxis(target, axisPoints[0], axes[0]);
+  const homeCenter = projectToAxis(homeTool, axisPoints[2], axes[2]);
+  const fixedRadius = target.distanceTo(fixedCenter);
+  const homeRadius = homeTool.distanceTo(homeCenter);
+  const branches = solutions.map((q) => {
+    const inverseJoint1 = expRevolute(axes[0], axisPoints[0], -q[0]);
+    const joint2 = expRevolute(axes[1], axisPoints[1], q[1]);
+    const inverseJoint2 = expRevolute(axes[1], axisPoints[1], -q[1]);
+    const branch = {
+      q,
+      intersection: target.clone().applyMatrix4(inverseJoint1),
+      reversedPoint: target.clone().applyMatrix4(inverseJoint1).applyMatrix4(inverseJoint2),
+      movingCenter: homeCenter.clone().applyMatrix4(joint2),
+      movingNormal: axes[2].clone().transformDirection(joint2)
+    };
+    const expectedAfterJoint3 = homeTool.clone().applyMatrix4(expRevolute(axes[2], axisPoints[2], q[2]));
+    const fixedCircleError = Math.abs(branch.intersection.distanceTo(fixedCenter) - fixedRadius);
+    const movingCircleError = Math.abs(branch.intersection.distanceTo(branch.movingCenter) - homeRadius);
+    const movingPlaneError = Math.abs(branch.intersection.clone().sub(branch.movingCenter).dot(branch.movingNormal));
+    const reverseError = branch.reversedPoint.distanceTo(expectedAfterJoint3);
+    if (Math.max(fixedCircleError, movingCircleError, movingPlaneError, reverseError) > 1e-5) {
+      throw new Error('CGA circle construction is inconsistent with an IK branch.');
+    }
+    return branch;
+  });
+  return {
+    target, fixedCenter, fixedRadius, fixedNormal: axes[0],
+    homePoint: homeTool.clone(), homeCenter, homeRadius, homeNormal: axes[2], branches
+  };
+}
+
+function addCgaCircle(world, center, radius, normal, color, label, labelOffset = new THREE.Vector3(.1, .1, .22)) {
+  addDiscInPlane(world, center, radius, normal, color);
+  const ring = addRingInPlane(world, center, radius, normal, color, 2);
+  if (label) addLabel(world, center.clone().add(labelOffset), label, color);
+  return ring;
+}
+
+function addPointMarker(world, point, color, label, offset = new THREE.Vector3(.1, .1, .25)) {
+  const marker = sphere(.105, color);
+  marker.position.copy(point);
+  world.add(marker);
+  if (label) addLabel(world, point.clone().add(offset), label, color);
+  return marker;
+}
+
+async function buildCgaCircles(kit) {
+  await loadRobotModel();
+  kit.setCamera([8.1, 6.3, 6.7], [1.7, .7, 1.15]);
+  const robot = await createRobot(kit.world, [0, 0, 0], { opacity: .78 });
+  const data = cgaCircleData();
+  addCgaCircle(kit.world, data.fixedCenter, data.fixedRadius, data.fixedNormal, 0xe85d04, 'C_B · fixed');
+  addCgaCircle(kit.world, data.homeCenter, data.homeRadius, data.homeNormal, 0x2775ff, 'C_A · home');
+  addPointMarker(kit.world, data.target, 0xff0000, 'p_d');
+  addPointMarker(kit.world, data.homePoint, 0x2775ff, 'p');
+  kit.world.add(makeAxis(robotModel.axisPoints[0], robotModel.axes[0], 4.7, 0xe85d04));
+  kit.world.add(makeAxis(robotModel.axisPoints[2], robotModel.axes[2], 3.5, 0x2775ff));
+  addLabel(kit.world, robotModel.axisPoints[0].clone().addScaledVector(robotModel.axes[0], 1.85), 'ω₁', 0xe85d04);
+  addLabel(kit.world, robotModel.axisPoints[2].clone().addScaledVector(robotModel.axes[2], 1.45), 'ω₃', 0x2775ff);
+  kit.note.textContent = 'Orange C_B is the joint-1 orbit through p_d; blue C_A is the joint-3 orbit through the home tool point p.';
+  return () => robot.update([0, 0, 0]);
+}
+
+async function buildCgaCircleMotion(kit) {
+  await loadRobotModel();
+  kit.setCamera([9.4, 7.3, 8.2], [1.55, .65, 1.55]);
+  const data = cgaCircleData();
+  const robot = await createRobot(kit.world, [0, 0, 0], { opacity: .38 });
+  addCgaCircle(kit.world, data.fixedCenter, data.fixedRadius, data.fixedNormal, 0xe85d04, 'C_B');
+  addPointMarker(kit.world, data.target, 0xff0000, 'p_d');
+  kit.world.add(makeAxis(robotModel.axisPoints[1], robotModel.axes[1], 5, 0x111111));
+  addLabel(kit.world, robotModel.axisPoints[1].clone().addScaledVector(robotModel.axes[1], 2), 'ω₂');
+  const moving = new THREE.Group();
+  moving.matrixAutoUpdate = false;
+  kit.world.add(moving);
+  addCgaCircle(moving, data.homeCenter, data.homeRadius, data.homeNormal, 0x2775ff, 'C_A(θ₂)');
+  const hits = data.branches.map((branch, index) => {
+    const marker = addPointMarker(kit.world, branch.intersection, 0xff0000, null);
+    marker.visible = false;
+    return marker;
+  });
+  kit.note.textContent = 'Only C_A rotates. A red sphere appears exactly when the moving circle reaches one of the two real intersections with C_B.';
+  return (time) => {
+    const angle = -Math.PI + ((time * .42) % (2 * Math.PI));
+    moving.matrix.copy(expRevolute(robotModel.axes[1], robotModel.axisPoints[1], angle));
+    moving.matrixWorldNeedsUpdate = true;
+    hits.forEach((marker, index) => {
+      const error = Math.abs(Math.atan2(
+        Math.sin(angle - data.branches[index].q[1]),
+        Math.cos(angle - data.branches[index].q[1])
+      ));
+      marker.visible = error < 5 * DEG;
+      marker.scale.setScalar(1 + .35 * Math.max(0, 1 - error / (5 * DEG)));
+    });
+    robot.update([0, 0, 0]);
+  };
+}
+
+async function buildCgaFourTheta2(kit) {
+  await loadRobotModel();
+  kit.setCamera([9.4, 7.5, 8.2], [1.55, .65, 1.55]);
+  const data = cgaCircleData();
+  await createRobot(kit.world, [0, 0, 0], { opacity: .18 });
+  addCgaCircle(kit.world, data.fixedCenter, data.fixedRadius, data.fixedNormal, 0xe85d04, 'C_B');
+  addPointMarker(kit.world, data.target, 0xff0000, 'p_d');
+  const moving = new THREE.Group();
+  moving.matrixAutoUpdate = false;
+  kit.world.add(moving);
+  addCgaCircle(moving, data.homeCenter, data.homeRadius, data.homeNormal, 0x2775ff, 'chosen C_A(θ₂)');
+  const hit = addPointMarker(kit.world, data.branches[0].intersection, 0xff0000, 'chosen x');
+  let selected = 0;
+  let startedAt = performance.now() / 1000;
+  addCgaBranchSelect(kit, data.branches, (index) => {
+    selected = index;
+    startedAt = performance.now() / 1000;
+    hit.position.copy(data.branches[index].intersection);
+  });
+  kit.note.textContent = 'Choose an IK circle. The blue home circle then rotates by its θ₂ until it meets the selected point on C_B.';
+  return (time) => {
+    const progress = smoothStep(Math.min(1, Math.max(0, (time - startedAt) / 2.8)));
+    const angle = data.branches[selected].q[1] * progress;
+    moving.matrix.copy(expRevolute(robotModel.axes[1], robotModel.axisPoints[1], angle));
+    moving.matrixWorldNeedsUpdate = true;
+  };
+}
+
+async function buildCgaBacksolve(kit) {
+  await loadRobotModel();
+  kit.setCamera([8.3, 6.1, 6.8], [1.7, .65, 1.1]);
+  const data = cgaCircleData();
+  const robot = await createRobot(kit.world, [0, 0, 0], { opacity: .82 });
+  addCgaCircle(kit.world, data.fixedCenter, data.fixedRadius, data.fixedNormal, 0xe85d04, 'C_B');
+  addPointMarker(kit.world, data.homePoint, 0x2775ff, 'p');
+  const movingCircle = new THREE.Group();
+  movingCircle.matrixAutoUpdate = false;
+  kit.world.add(movingCircle);
+  addCgaCircle(movingCircle, data.homeCenter, data.homeRadius, data.homeNormal, 0x00a676, 'C_A carried back');
+  const movingMarker = addPointMarker(kit.world, data.branches[0].intersection, 0x111111, 'dragged x');
+  let selected = 0;
+  let startedAt = performance.now() / 1000;
+  addCgaBranchSelect(kit, data.branches, (index) => {
+    selected = index;
+    startedAt = performance.now() / 1000;
+  });
+  kit.note.textContent = 'Start at the selected intersection. Apply -θ₂ to the whole circle and x; then rotate p about ω₃ until it reaches the dragged point.';
+  return (time) => {
+    const branch = data.branches[selected];
+    const phase = (time - startedAt) % 10;
+    const reversePhase = smoothStep((phase - 1) / 3);
+    const circleAngle = branch.q[1] * (1 - reversePhase);
+    movingCircle.matrix.copy(expRevolute(robotModel.axes[1], robotModel.axisPoints[1], circleAngle));
+    movingCircle.matrixWorldNeedsUpdate = true;
+    movingMarker.position.copy(branch.intersection)
+      .applyMatrix4(expRevolute(robotModel.axes[1], robotModel.axisPoints[1], -branch.q[1] * reversePhase));
+    const q3Phase = smoothStep((phase - 5) / 2.6);
+    robot.update([0, 0, branch.q[2] * q3Phase]);
+  };
+}
+
+async function buildCgaForward(kit) {
+  await loadRobotModel();
+  kit.setCamera([9.4, 7.2, 8], [1.6, .65, 1.5]);
+  const data = cgaCircleData();
+  const robot = await createRobot(kit.world, [0, 0, 0]);
+  addCgaCircle(kit.world, data.fixedCenter, data.fixedRadius, data.fixedNormal, 0xe85d04, 'C_B');
+  addCgaCircle(kit.world, data.homeCenter, data.homeRadius, data.homeNormal, 0x2775ff, 'C_A · home');
+  const carriedCircle = new THREE.Group();
+  carriedCircle.matrixAutoUpdate = false;
+  carriedCircle.visible = false;
+  kit.world.add(carriedCircle);
+  addCgaCircle(carriedCircle, data.homeCenter, data.homeRadius, data.homeNormal, 0x00a676, 'duplicate C_A');
+  const hit = addPointMarker(kit.world, data.branches[0].intersection, 0x00a676, 'x');
+  addPointMarker(kit.world, data.target, 0xff0000, 'p_d');
+  const eeMarker = addPointMarker(kit.world, data.homePoint, 0x111111, 'tool');
+  let selected = 0;
+  let startedAt = performance.now() / 1000;
+  addCgaBranchSelect(kit, data.branches, (index) => {
+    selected = index;
+    startedAt = performance.now() / 1000;
+    hit.position.copy(data.branches[index].intersection);
+  });
+  kit.note.textContent = 'Animated values are shown in order: θ₃ on C_A, θ₂ carrying a duplicate of C_A to x, then θ₁ carrying x to p_d.';
+  return (time) => {
+    const branch = data.branches[selected];
+    const phase = (time - startedAt) % 10;
+    const q3 = branch.q[2] * smoothStep((phase - .7) / 2.1);
+    const q2Progress = smoothStep((phase - 3.5) / 2);
+    const q2 = branch.q[1] * q2Progress;
+    const q1 = branch.q[0] * smoothStep((phase - 6.2) / 1.9);
+    carriedCircle.visible = phase >= 3.15;
+    carriedCircle.matrix.copy(expRevolute(robotModel.axes[1], robotModel.axisPoints[1], q2));
+    carriedCircle.matrixWorldNeedsUpdate = true;
+    robot.update([q1, q2, q3]);
+    eeMarker.position.copy(forwardPosition(robotModel, [q1, q2, q3]));
+    const degrees = [q3, q2, q1].map((angle) => `${fixed(angle / DEG, 1)}°`);
+    kit.note.textContent = `θ₃ = ${degrees[0]}  →  θ₂ = ${degrees[1]}  →  θ₁ = ${degrees[2]}`;
+  };
+}
+
+function smoothStep(value) {
+  const u = Math.max(0, Math.min(1, value));
+  return u * u * (3 - 2 * u);
+}
+
+function addCgaBranchSelect(kit, branches, onChange) {
+  const label = document.createElement('span');
+  label.className = 'ik3r-control-label';
+  label.textContent = 'Circle';
+  const select = document.createElement('select');
+  select.className = 'ik3r-label-select';
+  select.setAttribute('aria-label', 'Choose IK circle');
+  branches.forEach((branch, index) => {
+    const option = document.createElement('option');
+    option.value = index;
+    option.textContent = `IK ${index + 1} · θ₂ ${fixed(branch.q[1] / DEG, 1)}°`;
+    select.appendChild(option);
+  });
+  const update = () => onChange(Number(select.value));
+  select.addEventListener('change', update);
+  kit.cleaners.push(() => select.removeEventListener('change', update));
+  kit.controlHost.append(label, select);
+  return select;
+}
+
+function solvePositionIk(target) {
+  const seeds = [-135, -45, 45, 135].map((angle) => angle * DEG);
+  const solutions = [];
+  const wrap = (angle) => Math.atan2(Math.sin(angle), Math.cos(angle));
+  const residual = (q) => forwardPosition(robotModel, q).sub(target);
+  for (const q1 of seeds) for (const q2 of seeds) for (const q3 of seeds) {
+    const q = [q1, q2, q3];
+    for (let iteration = 0; iteration < 34; iteration += 1) {
+      const f = residual(q);
+      if (f.length() < 1e-8) break;
+      const h = 1e-5;
+      const columns = q.map((_, index) => {
+        const plus = q.slice(), minus = q.slice();
+        plus[index] += h;
+        minus[index] -= h;
+        return forwardPosition(robotModel, plus).sub(forwardPosition(robotModel, minus)).multiplyScalar(.5 / h);
+      });
+      const jacobian = new THREE.Matrix3().set(
+        columns[0].x, columns[1].x, columns[2].x,
+        columns[0].y, columns[1].y, columns[2].y,
+        columns[0].z, columns[1].z, columns[2].z
+      );
+      if (Math.abs(jacobian.determinant()) < 1e-9) break;
+      const delta = f.clone().multiplyScalar(-1).applyMatrix3(jacobian.clone().invert());
+      if (delta.length() > .55) delta.setLength(.55);
+      q[0] = wrap(q[0] + delta.x);
+      q[1] = wrap(q[1] + delta.y);
+      q[2] = wrap(q[2] + delta.z);
+    }
+    if (residual(q).length() < 2e-6 && !solutions.some((candidate) =>
+      Math.hypot(...q.map((angle, index) => wrap(angle - candidate[index]))) < 2e-4)) {
+      solutions.push(q.slice());
+    }
+  }
+  return solutions.sort((a, b) => a[1] - b[1]);
+}
+
+export async function solveCustom3RPositionIk(position) {
+  await loadRobotModel();
+  const target = position?.isVector3 ? position.clone() : new THREE.Vector3(...position);
+  return solvePositionIk(target);
+}
+
+function clearGroup(group) {
+  while (group.children.length) {
+    const child = group.children[0];
+    group.remove(child);
+    disposeObject(child);
+  }
+}
+
+async function buildCgaInteractive(kit) {
+  await loadRobotModel();
+  kit.container.classList.add('is-cga-interactive');
+  kit.setCamera([9.2, 7, 7.4], [1.55, .65, 1.25]);
+  const robot = await createRobot(kit.world, [0, 0, 0], { opacity: .72 });
+  const fixedLayer = new THREE.Group();
+  const movingLayer = new THREE.Group();
+  movingLayer.matrixAutoUpdate = false;
+  kit.world.add(fixedLayer, movingLayer);
+  const defaultTarget = ikExample.eePosition.clone().add(new THREE.Vector3(0, 0, CGA_TARGET_Z_OFFSET));
+  const state = {
+    target: defaultTarget.clone(), solutions: [], snapped: null, latched: null,
+    theta1: 0, theta2: 0, theta3: 0
+  };
+  let targetMarker;
+  let intersectionMarker;
+  const redrawTarget = () => {
+    state.solutions = solvePositionIk(state.target);
+    clearGroup(fixedLayer);
+    const data = cgaCircleData(state.target, state.solutions);
+    addCgaCircle(fixedLayer, data.fixedCenter, data.fixedRadius, data.fixedNormal, 0xe85d04, 'C_B');
+    targetMarker = addPointMarker(fixedLayer, data.target, 0xff0000, 'p_d');
+    clearGroup(movingLayer);
+    addCgaCircle(movingLayer, data.homeCenter, data.homeRadius, data.homeNormal, 0x2775ff, 'C_A(θ₂)');
+    if (intersectionMarker) {
+      kit.world.remove(intersectionMarker);
+      disposeObject(intersectionMarker);
+    }
+    intersectionMarker = addPointMarker(kit.world, data.homePoint, 0x00a676, null);
+    intersectionMarker.visible = false;
+    state.snapped = null;
+    state.latched = null;
+    updateScene();
+  };
+  const updateScene = () => {
+    const nearest = state.solutions.reduce((best, q, index) => {
+      const error = Math.abs(Math.atan2(Math.sin(state.theta2 - q[1]), Math.cos(state.theta2 - q[1])));
+      return !best || error < best.error ? { index, error } : best;
+    }, null);
+    if (nearest && nearest.error < 4 * DEG) {
+      state.snapped = nearest.index;
+      state.latched = nearest.index;
+      state.theta2 = state.solutions[nearest.index][1];
+    } else state.snapped = null;
+    let circleTransform = expRevolute(robotModel.axes[1], robotModel.axisPoints[1], state.theta2);
+    if (state.latched !== null) {
+      const data = cgaCircleData(state.target, state.solutions);
+      const branch = data.branches[state.latched];
+      intersectionMarker.visible = true;
+      if (Math.abs(state.theta1) > DEG) {
+        const joint1Motion = expRevolute(robotModel.axes[0], robotModel.axisPoints[0], state.theta1);
+        circleTransform = joint1Motion.clone().multiply(
+          expRevolute(robotModel.axes[1], robotModel.axisPoints[1], branch.q[1])
+        );
+        intersectionMarker.position.copy(branch.intersection).applyMatrix4(joint1Motion);
+      } else {
+        intersectionMarker.position.copy(branch.intersection).applyMatrix4(
+          expRevolute(robotModel.axes[1], robotModel.axisPoints[1], state.theta2 - branch.q[1])
+        );
+      }
+    } else intersectionMarker.visible = false;
+    movingLayer.matrix.copy(circleTransform);
+    movingLayer.matrixWorldNeedsUpdate = true;
+    const latchedBranch = state.latched === null ? null : state.solutions[state.latched];
+    const robotTheta2 = latchedBranch && Math.abs(state.theta1) > DEG ? latchedBranch[1] : 0;
+    robot.update([state.theta1, robotTheta2, state.theta3]);
+    const status = state.solutions.length
+      ? `${state.solutions.length} IK branch${state.solutions.length === 1 ? '' : 'es'} · ${state.latched === null ? 'drag θ₂ toward a solution' : `IK ${state.latched + 1} latched${state.snapped === null ? ' · drag the circle back toward 0°' : ''}`}`
+      : 'No real position-IK branch for this target';
+    kit.note.textContent = status;
+  };
+  const targetInputs = [
+    ['pₓ', -3.5, 4.5, .05, state.target.x, 'x'],
+    ['pᵧ', -3.5, 4.5, .05, state.target.y, 'y'],
+    ['p_z', -.5, 5, .05, state.target.z, 'z']
+  ];
+  targetInputs.forEach(([label, min, max, step, value, key]) => addConicSlider(
+    kit, label, min, max, step, value,
+    (next) => { state.target[key] = next; redrawTarget(); }
+  ));
+  const jointInputs = [
+    ['θ₂', 'theta2'], ['θ₃', 'theta3'], ['θ₁', 'theta1']
+  ];
+  jointInputs.forEach(([label, key]) => addConicSlider(
+    kit, label, -180, 180, .5, 0,
+    (next) => { state[key] = next * DEG; updateScene(); }
+  ));
+  redrawTarget();
+  kit.note.textContent = 'Set p_d, drag θ₂ until it snaps to an intersection, return the circle toward home, then use θ₃ and θ₁ to complete the construction.';
+  return () => updateScene();
+}
+
+async function buildCgaTorus(kit) {
+  await loadRobotModel();
+  kit.setCamera([10.2, 8.2, 8.3], [1.55, .65, 1.05]);
+  const data = cgaCircleData();
+  await createRobot(kit.world, [0, 0, 0], { opacity: .14 });
+  kit.world.add(makeSweptCircleSurface(data, 96, 64, 0x2775ff, .14));
+  addCgaCircle(kit.world, data.fixedCenter, data.fixedRadius, data.fixedNormal, 0xe85d04, 'C_B');
+  const offsets = [
+    new THREE.Vector3(.18, -.38, .12), new THREE.Vector3(.2, .22, .18),
+    new THREE.Vector3(-.28, .18, .34), new THREE.Vector3(.25, -.12, .42)
+  ];
+  data.branches.forEach((branch, index) => addPointMarker(
+    kit.world, branch.intersection, 0xff0000, `${index + 1}`, offsets[index]
+  ));
+  kit.note.textContent = 'The blue swept surface is generated by C_A(θ₂). The raised target circle C_B intersects it at two real IK points.';
+  return () => {};
+}
+
+function makeSweptCircleSurface(data, thetaSegments, circleSegments, color, opacity) {
+  const normal = data.homeNormal.clone().normalize();
+  const uAxis = data.homePoint.clone().sub(data.homeCenter).normalize();
+  const vAxis = normal.clone().cross(uAxis).normalize();
+  const positions = [];
+  const indices = [];
+  for (let i = 0; i <= thetaSegments; i += 1) {
+    const theta = -Math.PI + (2 * Math.PI * i) / thetaSegments;
+    const transform = expRevolute(robotModel.axes[1], robotModel.axisPoints[1], theta);
+    for (let j = 0; j <= circleSegments; j += 1) {
+      const phi = (2 * Math.PI * j) / circleSegments;
+      const point = data.homeCenter.clone()
+        .addScaledVector(uAxis, data.homeRadius * Math.cos(phi))
+        .addScaledVector(vAxis, data.homeRadius * Math.sin(phi))
+        .applyMatrix4(transform);
+      positions.push(point.x, point.y, point.z);
+    }
+  }
+  const row = circleSegments + 1;
+  for (let i = 0; i < thetaSegments; i += 1) {
+    for (let j = 0; j < circleSegments; j += 1) {
+      const a = i * row + j, b = a + row;
+      indices.push(a, b, a + 1, b, b + 1, a + 1);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
+    color, transparent: true, opacity, side: THREE.DoubleSide, depthWrite: false,
+    roughness: .72, metalness: .02
+  }));
 }
 
 async function buildConicInterpretation(kit) {
@@ -850,6 +1493,74 @@ function circleIntersections(fn) {
     value0 = value1;
   }
   return roots;
+}
+
+function zeroRobotModel() {
+  const axisPoints = [v([0, 0, .5]), v([0, 0, 1]), v([2, 1.25, 1])];
+  const axes = [v([0, 0, 1]), v([0, 1, 0]), v([0, 0, 1])];
+  const homeLinks = [
+    new THREE.Matrix4(),
+    new THREE.Matrix4().makeTranslation(0, 0, .5),
+    new THREE.Matrix4().makeTranslation(0, 0, 1),
+    new THREE.Matrix4().makeTranslation(2, 1.25, 1)
+  ];
+  return {
+    axisPoints,
+    axes,
+    homeLinks,
+    homeTool: v([3.5, 1.25, 1.75]),
+    meshSpecs: [
+      { file: 'base_link.stl', prefix: 0, visual: new THREE.Matrix4(), color: 0x333638 },
+      { file: 'link_1_0.stl', prefix: 1, visual: new THREE.Matrix4(), color: 0x0d7d80 },
+      { file: 'link_2.stl', prefix: 2, visual: rpyMatrix(0, .25, 0, 0, 0, -1.5707), color: 0xb8b8b8 },
+      { file: 'link_3_d3.stl', prefix: 3, visual: new THREE.Matrix4().makeTranslation(0, 0, .25), color: 0x0d7d80 }
+    ]
+  };
+}
+
+function zeroPrefixMatrix(q, count) {
+  const model = zeroRobotModel();
+  const matrix = new THREE.Matrix4();
+  for (let i = 0; i < count; i += 1) {
+    matrix.multiply(expRevolute(model.axes[i], model.axisPoints[i], q[i]));
+  }
+  return matrix;
+}
+
+async function createZeroRobot(world, q = [0, 0, 0], options = {}) {
+  const model = zeroRobotModel();
+  const group = new THREE.Group();
+  const visuals = [];
+  world.add(group);
+  await Promise.all(model.meshSpecs.map(async (spec) => {
+    const geometry = await loadVariantGeometry(spec.file);
+    const holder = new THREE.Group();
+    holder.matrixAutoUpdate = false;
+    const opacity = options.opacity ?? 1;
+    const color = options.colors?.[spec.prefix] ?? spec.color;
+    holder.add(new THREE.Mesh(geometry.clone(), new THREE.MeshStandardMaterial({
+      color,
+      roughness: .62,
+      metalness: .06,
+      transparent: opacity < 1,
+      opacity,
+      depthWrite: opacity > .85
+    })));
+    group.add(holder);
+    visuals.push({
+      holder,
+      prefix: spec.prefix,
+      home: model.homeLinks[spec.prefix].clone().multiply(spec.visual)
+    });
+  }));
+  const update = (values) => {
+    visuals.forEach((item) => {
+      item.holder.matrix.multiplyMatrices(zeroPrefixMatrix(values, item.prefix), item.home);
+      item.holder.matrixWorldNeedsUpdate = true;
+    });
+  };
+  update(q);
+  return { group, update, model };
 }
 
 async function createRobot(world, q = [0, 0, 0], options = {}) {
@@ -1124,6 +1835,34 @@ function addRingInPlane(world, center, radius, normal, color, width = 1) {
   ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal.clone().normalize());
   world.add(ring);
   return ring;
+}
+
+function addWireSphere(world, center, radius, color) {
+  const geometry = new THREE.SphereGeometry(radius, 28, 18);
+  const wireframe = new THREE.LineSegments(
+    new THREE.WireframeGeometry(geometry),
+    new THREE.LineBasicMaterial({ color, transparent: true, opacity: .24 })
+  );
+  wireframe.position.copy(center);
+  world.add(wireframe);
+  return wireframe;
+}
+
+function addDiscInPlane(world, center, radius, normal, color) {
+  const disc = new THREE.Mesh(
+    new THREE.CircleGeometry(radius, 72),
+    new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: .07,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    })
+  );
+  disc.position.copy(center);
+  disc.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal.clone().normalize());
+  world.add(disc);
+  return disc;
 }
 
 function tube(start, end, radius, color, opacity = 1) {

@@ -7,7 +7,7 @@
 document.addEventListener('DOMContentLoaded', async () => {
   // Keep the visualization module graph on one revision. This prevents browsers
   // from mixing a newly edited demo with stale cached dependencies.
-  const revision = '20260814-20';
+const revision = '20260819-57';
   const loaders = [
     async () => {
       const module = await import(`./viz/robot2r.js?v=${revision}`);
@@ -28,6 +28,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     async () => {
       const module = await import(`./viz/custom3rIk.js?v=${revision}`);
       module.initCustom3RIkDemos?.();
+    },
+    async () => {
+      const module = await import(`./viz/custom6rIk.js?v=${revision}`);
+      module.initCustom6RIkDemos?.();
+    },
+    async () => {
+      const module = await import(`./viz/pumaIiwaIk.js?v=${revision}`);
+      module.initPumaIiwaIkDemos?.();
+    },
+    async () => {
+      const module = await import(`./viz/singularityLecture.js?v=${revision}`);
+      module.initSingularityLecture?.();
+    },
+    async () => {
+      const module = await import(`./viz/cuspidalityLecture.js?v=${revision}`);
+      module.initCuspidalityLecture?.();
     }
   ];
 

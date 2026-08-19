@@ -389,6 +389,20 @@
 .ik3r-slider-control input { width: 4.6rem; }
 .ik3r-slider-control output { font-variant-numeric: tabular-nums; text-align: right; }
 
+.is-cga-interactive .ik3r-controls {
+  left: .55rem;
+  right: .55rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  row-gap: .18rem;
+}
+
+.is-cga-interactive .ik3r-slider-control {
+  grid-template-columns: auto 3.8rem 2.25rem;
+}
+
+.is-cga-interactive .ik3r-slider-control input { width: 3.8rem; }
+
 .ik3r-label-select {
   min-width: 5.2rem;
   padding: .14rem .25rem;
